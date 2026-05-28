@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beam Designer — Fixed-Fixed Beam Stress Explorer</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Beam Designer</h1>
+    <p class="subtitle">Fixed–fixed beam · prescribed center displacement · live stress &amp; yield state</p>
+  </header>
+
+  <div class="layout">
+    <!-- ───────────────── Sidebar: controls ───────────────── -->
+    <aside class="sidebar">
+      <section class="ctrl-group">
+        <div class="ctrl-row units-row">
+          <span class="ctrl-label">Units</span>
+          <div class="seg" id="unit-toggle" role="group" aria-label="Unit system">
+            <button type="button" data-unit="SI" class="active">SI</button>
+            <button type="button" data-unit="imperial">Imperial</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="ctrl-group">
+        <h2>Material</h2>
+        <div class="ctrl-row">
+          <label for="material-select">Preset</label>
+          <select id="material-select"></select>
+        </div>
+        <div class="ctrl-row">
+          <label for="E-num">E (<span data-unit-label="modulus">GPa</span>)</label>
+          <input type="number" id="E-num" step="any" min="0" />
+        </div>
+        <div class="ctrl-row">
+          <label for="sigmaY-num">σ<sub>Y</sub> (<span data-unit-label="stress">MPa</span>)</label>
+          <input type="number" id="sigmaY-num" step="any" min="0" />
+        </div>
+      </section>
+
+      <section class="ctrl-group" id="geometry-controls">
+        <h2>Geometry &amp; load</h2>
+        <!-- numeric controls injected here by app.js -->
+      </section>
+
+      <section class="ctrl-group cut-group">
+        <h2>Cut location</h2>
+        <p class="cut-status" id="cut-status">Hover the beam to move the cut; click to pin.</p>
+        <button type="button" id="unpin-btn" class="btn" disabled>Unpin (follow cursor)</button>
+      </section>
+
+      <section class="ctrl-group">
+        <div class="fos-badge" id="fos-badge">
+          <span class="fos-label">Min factor of safety</span>
+          <span class="fos-value" id="fos-value">—</span>
+          <span class="fos-state" id="fos-state"></span>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ───────────────── Main content ───────────────── -->
+    <main class="content">
+      <section class="panel beam-panel">
+        <h3>Beam <span class="hint">(hover to scan · click to pin · ←/→ to nudge)</span></h3>
+        <svg id="beam-svg" class="svg-beam" tabindex="0" role="slider"
+             aria-label="Beam cut location" aria-valuemin="0" aria-valuenow="0"></svg>
+      </section>
+
+      <div class="mid-row">
+        <section class="panel diagrams-panel">
+          <h3>Internal forces</h3>
+          <div class="diagram-label">Shear V(x)</div>
+          <svg id="shear-svg" class="svg-diagram"></svg>
+          <div class="diagram-label">Moment M(x)</div>
+          <svg id="moment-svg" class="svg-diagram"></svg>
+        </section>
+
+        <section class="panel section-panel">
+          <h3>Cross-section at cut</h3>
+          <svg id="section-svg" class="svg-section"></svg>
+        </section>
+      </div>
+
+      <section class="panel readout-panel">
+        <div id="readouts" class="readouts"></div>
+      </section>
+
+      <div class="plot-grid">
+        <section class="panel plot-row" data-point="na">
+          <h3><span class="dot dot-na"></span> Neutral axis — pure shear
+            <span class="plot-sub" id="na-sub"></span></h3>
+          <div class="plot-pair">
+            <div class="plot-cell">
+              <div class="plot-title">Mohr's circle</div>
+              <svg id="mohr-na-svg" class="svg-plot"></svg>
+            </div>
+            <div class="plot-cell">
+              <div class="plot-title">Yield envelope (σ₁–σ₂)</div>
+              <svg id="env-na-svg" class="svg-plot"></svg>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel plot-row" data-point="fiber">
+          <h3><span class="dot dot-fiber"></span> Extreme fiber — pure bending
+            <span class="plot-sub" id="fiber-sub"></span></h3>
+          <div class="plot-pair">
+            <div class="plot-cell">
+              <div class="plot-title">Mohr's circle</div>
+              <svg id="mohr-fiber-svg" class="svg-plot"></svg>
+            </div>
+            <div class="plot-cell">
+              <div class="plot-title">Yield envelope (σ₁–σ₂)</div>
+              <svg id="env-fiber-svg" class="svg-plot"></svg>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="app-footer">
+        <p>Euler–Bernoulli model (shear deformation neglected). Reported FoS is the minimum
+        of the two canonical points, not a full through-depth search. Bending governs for
+        slender beams; transverse shear can govern for short, deep beams (low L/h).</p>
+      </footer>
+    </main>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

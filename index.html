@@ -100,60 +100,61 @@
 
     <!-- ───────────────── Main content ───────────────── -->
     <main class="content">
-      <section class="panel beam-panel">
-        <h3>Beam <span class="hint">(hover to scan · click to pin · ←/→ to nudge)</span></h3>
-        <svg id="beam-svg" class="svg-beam" tabindex="0" role="slider"
-             aria-label="Beam cut location" aria-valuemin="0" aria-valuenow="0"></svg>
-      </section>
+      <div class="top-row">
+        <!-- Left column: beam · internal forces · readouts -->
+        <div class="col-left">
+          <section class="panel beam-panel">
+            <h3>Beam <span class="hint">(hover to scan · click to pin · ←/→ to nudge)</span></h3>
+            <svg id="beam-svg" class="svg-beam" tabindex="0" role="slider"
+                 aria-label="Beam cut location" aria-valuemin="0" aria-valuenow="0"></svg>
+          </section>
 
-      <div class="mid-row">
-        <section class="panel diagrams-panel">
-          <h3>Internal forces</h3>
-          <div class="diagram-label">Shear V(x)</div>
-          <svg id="shear-svg" class="svg-diagram"></svg>
-          <div class="diagram-label">Moment M(x)</div>
-          <svg id="moment-svg" class="svg-diagram"></svg>
-        </section>
+          <section class="panel diagrams-panel">
+            <h3>Internal forces</h3>
+            <div class="diagram-label">Shear V(x)</div>
+            <svg id="shear-svg" class="svg-diagram"></svg>
+            <div class="diagram-label">Moment M(x)</div>
+            <svg id="moment-svg" class="svg-diagram"></svg>
+          </section>
 
-        <section class="panel section-panel">
-          <h3>Cross-section at cut</h3>
-          <svg id="section-svg" class="svg-section"></svg>
-        </section>
+          <section class="panel readout-panel">
+            <div id="readouts" class="readouts"></div>
+          </section>
+        </div>
+
+        <!-- Right column: cross-section dimensions (to scale) · stress at cut -->
+        <div class="col-right">
+          <section class="panel sectiondims-panel">
+            <h3>Cross-section dimensions</h3>
+            <svg id="section-dims-svg" class="svg-section-dims"></svg>
+          </section>
+
+          <section class="panel section-panel">
+            <h3>Stress in cross-section at cut</h3>
+            <svg id="section-svg" class="svg-section"></svg>
+          </section>
+        </div>
       </div>
 
-      <section class="panel readout-panel">
-        <div id="readouts" class="readouts"></div>
-      </section>
-
+      <!-- Full-width analysis band: four plots in one row -->
       <div class="plot-grid">
-        <section class="panel plot-row" data-point="na">
-          <h3><span class="dot dot-na"></span> Neutral axis — pure shear
-            <span class="plot-sub" id="na-sub"></span></h3>
-          <div class="plot-pair">
-            <div class="plot-cell">
-              <div class="plot-title">Mohr's circle</div>
-              <svg id="mohr-na-svg" class="svg-plot"></svg>
-            </div>
-            <div class="plot-cell">
-              <div class="plot-title">Yield envelope (σ₁–σ₂)</div>
-              <svg id="env-na-svg" class="svg-plot"></svg>
-            </div>
-          </div>
+        <section class="panel plot-cell" data-point="na">
+          <div class="plot-title"><span class="dot dot-na"></span> NA · Mohr's circle
+            <span class="plot-sub" id="na-sub"></span></div>
+          <svg id="mohr-na-svg" class="svg-plot"></svg>
         </section>
-
-        <section class="panel plot-row" data-point="fiber">
-          <h3><span class="dot dot-fiber"></span> Extreme fiber — pure bending
-            <span class="plot-sub" id="fiber-sub"></span></h3>
-          <div class="plot-pair">
-            <div class="plot-cell">
-              <div class="plot-title">Mohr's circle</div>
-              <svg id="mohr-fiber-svg" class="svg-plot"></svg>
-            </div>
-            <div class="plot-cell">
-              <div class="plot-title">Yield envelope (σ₁–σ₂)</div>
-              <svg id="env-fiber-svg" class="svg-plot"></svg>
-            </div>
-          </div>
+        <section class="panel plot-cell" data-point="na">
+          <div class="plot-title"><span class="dot dot-na"></span> NA · Yield envelope (σ₁–σ₂)</div>
+          <svg id="env-na-svg" class="svg-plot"></svg>
+        </section>
+        <section class="panel plot-cell" data-point="fiber">
+          <div class="plot-title"><span class="dot dot-fiber"></span> Fiber · Mohr's circle
+            <span class="plot-sub" id="fiber-sub"></span></div>
+          <svg id="mohr-fiber-svg" class="svg-plot"></svg>
+        </section>
+        <section class="panel plot-cell" data-point="fiber">
+          <div class="plot-title"><span class="dot dot-fiber"></span> Fiber · Yield envelope (σ₁–σ₂)</div>
+          <svg id="env-fiber-svg" class="svg-plot"></svg>
         </section>
       </div>
 

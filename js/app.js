@@ -7,9 +7,7 @@
 import { computeDerived } from './beam.js';
 import { MATERIALS, findMaterial, getUserMaterials, saveUserMaterial } from './materials.js';
 import { toCanonical, fromCanonical, unitLabel, fmtVal, fmtNum } from './units.js';
-import { COLORS, refreshColors, drawBeam, drawDiagram, drawSection, drawMohr, drawEnvelope } from './plots.js';
-
-const BEAM_PAD_X = 60; // must match padX inside drawBeam for pointer->x mapping
+import { COLORS, refreshColors, drawBeam, drawDiagram, drawSection, drawSectionDims, drawMohr, drawEnvelope, beamPadX } from './plots.js';
 
 // ───────────────────────── Defaults & State ─────────────────────────
 const DEF_MAT = MATERIALS[0]; // Steel (mild, A36)
@@ -48,6 +46,7 @@ const beamSvg = $('beam-svg');
 const shearSvg = $('shear-svg');
 const momentSvg = $('moment-svg');
 const sectionSvg = $('section-svg');
+const sectionDimsSvg = $('section-dims-svg');
 const mohrNaSvg = $('mohr-na-svg');
 const envNaSvg = $('env-na-svg');
 const mohrFiberSvg = $('mohr-fiber-svg');
@@ -447,7 +446,8 @@ function wireThemeToggle() {
 // ───────────────────────── Cut interaction ─────────────────────────
 function beamXFromEvent(evt) {
   const rect = beamSvg.getBoundingClientRect();
-  const x0 = BEAM_PAD_X, x1 = rect.width - BEAM_PAD_X;
+  const padX = beamPadX(rect.width); // identical to drawBeam's padX → exact pointer mapping
+  const x0 = padX, x1 = rect.width - padX;
   const px = evt.clientX - rect.left;
   const frac = clamp((px - x0) / Math.max(1, x1 - x0), 0, 1);
   return frac * state.L;
@@ -553,28 +553,29 @@ function buildDesignToolbar() {
 function updateReadouts(d) {
   const s = state.unitSystem;
   const fv = (v, cat) => fmtVal(v, s, cat, 3);
-  const stat = (l, v) => `<div class="stat"><span>${l}</span><span>${v}</span></div>`;
-  const block = (title, cls, inner) => `<div class="readout-block ${cls}"><h4>${title}</h4>${inner}</div>`;
+  const row = (l, v) => `<tr><th>${l}</th><td>${v}</td></tr>`;
+  const tbl = (title, cls, rows) =>
+    `<div class="ro-group ${cls}"><h4>${title}</h4><table class="ro-table"><tbody>${rows}</tbody></table></div>`;
   readouts.innerHTML =
-    block('Loading &amp; reactions', '',
-      stat('Central load P', fv(d.P, 'force')) +
-      stat('Center displacement δ', fv(d.delta, 'length')) +
-      stat('Wall reaction R', fv(d.R, 'force')) +
-      stat('|M| wall = center', fv(d.Mwall, 'moment'))) +
-    block('At cut', '',
-      stat('x', fv(d.xEval, 'length')) +
-      stat('M(x)', fv(d.Mx, 'moment')) +
-      stat('V(x)', fv(d.Vx, 'force'))) +
-    block('Neutral axis (shear)', 'na',
-      stat('τ', fv(d.pointNA.tau, 'stress')) +
-      stat('σ₁ / σ₂', `${fv(d.pointNA.s1, 'stress')} / ${fv(d.pointNA.s2, 'stress')}`) +
-      stat('σ_vM', fv(d.pointNA.vM, 'stress')) +
-      stat('FoS vM / Tr', `${fmtNum(d.pointNA.fosVM, 3)} / ${fmtNum(d.pointNA.fosT, 3)}`)) +
-    block('Extreme fiber (bending)', 'fiber',
-      stat('σₓ', fv(d.pointFiber.sigma_x, 'stress')) +
-      stat('σ₁ / σ₂', `${fv(d.pointFiber.s1, 'stress')} / ${fv(d.pointFiber.s2, 'stress')}`) +
-      stat('σ_vM', fv(d.pointFiber.vM, 'stress')) +
-      stat('FoS vM / Tr', `${fmtNum(d.pointFiber.fosVM, 3)} / ${fmtNum(d.pointFiber.fosT, 3)}`));
+    tbl('Loading &amp; reactions', '',
+      row('Central load P', fv(d.P, 'force')) +
+      row('Center displacement δ', fv(d.delta, 'length')) +
+      row('Wall reaction R', fv(d.R, 'force')) +
+      row('|M| wall = center', fv(d.Mwall, 'moment'))) +
+    tbl('At cut', '',
+      row('x', fv(d.xEval, 'length')) +
+      row('M(x)', fv(d.Mx, 'moment')) +
+      row('V(x)', fv(d.Vx, 'force'))) +
+    tbl('Neutral axis (shear)', 'na',
+      row('τ', fv(d.pointNA.tau, 'stress')) +
+      row('σ₁ / σ₂', `${fv(d.pointNA.s1, 'stress')} / ${fv(d.pointNA.s2, 'stress')}`) +
+      row('σ_vM', fv(d.pointNA.vM, 'stress')) +
+      row('FoS vM / Tr', `${fmtNum(d.pointNA.fosVM, 3)} / ${fmtNum(d.pointNA.fosT, 3)}`)) +
+    tbl('Extreme fiber (bending)', 'fiber',
+      row('σₓ', fv(d.pointFiber.sigma_x, 'stress')) +
+      row('σ₁ / σ₂', `${fv(d.pointFiber.s1, 'stress')} / ${fv(d.pointFiber.s2, 'stress')}`) +
+      row('σ_vM', fv(d.pointFiber.vM, 'stress')) +
+      row('FoS vM / Tr', `${fmtNum(d.pointFiber.fosVM, 3)} / ${fmtNum(d.pointFiber.fosT, 3)}`));
 }
 
 function updateFoS(d) {
@@ -614,6 +615,7 @@ function render() {
   drawDiagram(shearSvg, d, 'V', sys);
   drawDiagram(momentSvg, d, 'M', sys);
   drawSection(sectionSvg, d, sys);
+  drawSectionDims(sectionDimsSvg, state, sys);
   drawMohr(mohrNaSvg, d.pointNA, d.sigmaY, COLORS.na, sys);
   drawEnvelope(envNaSvg, d.pointNA, d.sigmaY, sys);
   drawMohr(mohrFiberSvg, d.pointFiber, d.sigmaY, COLORS.fiber, sys);

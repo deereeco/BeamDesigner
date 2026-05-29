@@ -4,12 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Beam Designer — Fixed-Fixed Beam Stress Explorer</title>
+  <!-- Apply the saved/system theme before first paint to avoid a flash. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('beam-theme');
+        var dark = saved ? saved === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) { /* localStorage unavailable: fall back to light */ }
+    })();
+  </script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <header class="app-header">
-    <h1>Beam Designer</h1>
-    <p class="subtitle">Fixed–fixed beam · prescribed center displacement · live stress &amp; yield state</p>
+    <div class="header-titles">
+      <h1>Beam Designer</h1>
+      <p class="subtitle">Fixed–fixed beam · prescribed center displacement · live stress &amp; yield state</p>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" type="button"
+            aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
   </header>
 
   <div class="layout">

@@ -5,12 +5,23 @@
 import { shapeNorm } from './beam.js';
 import { fmtVal, fmtNum, unitLabel } from './units.js';
 
-export const COLORS = {
-  na: '#0d9488', fiber: '#ea580c', accent: '#4f46e5',
-  safe: '#16a34a', warn: '#d97706', danger: '#dc2626',
-  axis: '#94a3b8', grid: '#e2e8f0', ink: '#0f172a', muted: '#64748b',
-  shear: '#0891b2', moment: '#7c3aed',
-};
+// Populated from CSS custom properties by refreshColors() so drawings follow the
+// active theme. Mutated in place (not reassigned) to keep live imports valid.
+export const COLORS = {};
+
+export function refreshColors() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n) => cs.getPropertyValue(n).trim();
+  Object.assign(COLORS, {
+    na: v('--na'), fiber: v('--fiber'), accent: v('--accent'),
+    safe: v('--safe'), warn: v('--warn'), danger: v('--danger'),
+    axis: v('--axis'), grid: v('--grid'), ink: v('--ink'), muted: v('--muted'),
+    shear: v('--shear'), moment: v('--moment'),
+    wall: v('--svg-wall'), wallHatch: v('--svg-wall-hatch'),
+    band: v('--svg-band'), bandStroke: v('--svg-band-stroke'),
+    cut: v('--svg-cut'), halo: v('--svg-halo'), sectionFill: v('--svg-section-fill'),
+  });
+}
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -73,11 +84,11 @@ export function drawBeam(svg, state, d, system) {
   const wallW = 16, wallH = beamHalf + 14;
   for (const side of ['L', 'R']) {
     const wx = side === 'L' ? x0 - wallW : x1;
-    g.appendChild(el('rect', { x: wx, y: midY - wallH, width: wallW, height: 2 * wallH, fill: '#475569' }));
+    g.appendChild(el('rect', { x: wx, y: midY - wallH, width: wallW, height: 2 * wallH, fill: COLORS.wall }));
     for (let yy = -wallH; yy < wallH; yy += 6) {
       g.appendChild(el('line', {
         x1: wx, y1: midY + yy + 6, x2: wx + wallW, y2: midY + yy,
-        stroke: '#94a3b8', 'stroke-width': 1,
+        stroke: COLORS.wallHatch, 'stroke-width': 1,
       }));
     }
   }
@@ -93,7 +104,7 @@ export function drawBeam(svg, state, d, system) {
     bot.push([toPx(x), yc + beamHalf]);
   }
   const band = polyPath(top) + ' ' + bot.slice().reverse().map((p) => `L${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(' ') + ' Z';
-  g.appendChild(el('path', { d: band, fill: '#cbd5e1', 'fill-opacity': 0.55, stroke: '#64748b', 'stroke-width': 1.5 }));
+  g.appendChild(el('path', { d: band, fill: COLORS.band, 'fill-opacity': 0.55, stroke: COLORS.bandStroke, 'stroke-width': 1.5 }));
 
   // Displacement arrow at center (when deflected).
   if (Math.abs(amp) > 2) {
@@ -119,13 +130,13 @@ export function drawBeam(svg, state, d, system) {
   const xE = d.xEval, cx = toPx(xE), yc = yCenter(xE);
   g.appendChild(el('line', {
     x1: cx, y1: yc - beamHalf - 16, x2: cx, y2: yc + beamHalf + 16,
-    stroke: pinned ? COLORS.accent : '#334155',
+    stroke: pinned ? COLORS.accent : COLORS.cut,
     'stroke-width': pinned ? 2.5 : 1.5,
     'stroke-dasharray': pinned ? null : '5 4',
   }));
   // Evaluation-point dots: neutral axis (center) and extreme fiber (top).
-  g.appendChild(el('circle', { cx, cy: yc - beamHalf, r: 5, fill: COLORS.fiber, stroke: '#fff', 'stroke-width': 1.5 }));
-  g.appendChild(el('circle', { cx, cy: yc, r: 5, fill: COLORS.na, stroke: '#fff', 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx, cy: yc - beamHalf, r: 5, fill: COLORS.fiber, stroke: COLORS.halo, 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx, cy: yc, r: 5, fill: COLORS.na, stroke: COLORS.halo, 'stroke-width': 1.5 }));
 
   // Location label.
   g.appendChild(txt(cx, padTop - 14, `x = ${fmtVal(xE, system, 'length', 3)}${pinned ? '  📌 pinned' : ''}`, {
@@ -187,10 +198,10 @@ export function drawSection(svg, d, system) {
 
   // Column A: the rectangular section.
   const colAw = Math.min(58, w * 0.16), colAx = padL;
-  g.appendChild(el('rect', { x: colAx, y: yTop, width: colAw, height: yBot - yTop, fill: '#e2e8f0', stroke: '#64748b', 'stroke-width': 1.2 }));
+  g.appendChild(el('rect', { x: colAx, y: yTop, width: colAw, height: yBot - yTop, fill: COLORS.sectionFill, stroke: COLORS.bandStroke, 'stroke-width': 1.2 }));
   g.appendChild(el('line', { x1: colAx - 4, y1: toY(0), x2: colAx + colAw + 4, y2: toY(0), stroke: COLORS.na, 'stroke-dasharray': '4 3', 'stroke-width': 1.2 }));
-  g.appendChild(el('circle', { cx: colAx + colAw / 2, cy: toY(0), r: 5, fill: COLORS.na, stroke: '#fff', 'stroke-width': 1.5 }));
-  g.appendChild(el('circle', { cx: colAx + colAw / 2, cy: toY(c), r: 5, fill: COLORS.fiber, stroke: '#fff', 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx: colAx + colAw / 2, cy: toY(0), r: 5, fill: COLORS.na, stroke: COLORS.halo, 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx: colAx + colAw / 2, cy: toY(c), r: 5, fill: COLORS.fiber, stroke: COLORS.halo, 'stroke-width': 1.5 }));
   g.appendChild(txt(colAx + colAw / 2, h - 8, 'section', { size: 10 }));
 
   // Stress plots share the vertical depth axis.
@@ -269,7 +280,7 @@ export function drawMohr(svg, pt, sigmaY, color, system) {
   g.appendChild(el('circle', { cx: X(pt.s1), cy: Y(0), r: 3.5, fill: COLORS.ink }));
   g.appendChild(el('circle', { cx: X(pt.s2), cy: Y(0), r: 3.5, fill: COLORS.ink }));
   g.appendChild(el('circle', { cx: X(0), cy: Y(-pt.tau), r: 3, fill: color, 'fill-opacity': 0.4 }));
-  g.appendChild(el('circle', { cx: X(pt.sigma_x), cy: Y(pt.tau), r: 4.5, fill: color, stroke: '#fff', 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx: X(pt.sigma_x), cy: Y(pt.tau), r: 4.5, fill: color, stroke: COLORS.halo, 'stroke-width': 1.5 }));
 
   // Readouts.
   g.appendChild(txt(cx, h - 6, `σ₁=${fmtVal(pt.s1, system, 'stress', 3)}  σ₂=${fmtVal(pt.s2, system, 'stress', 3)}  τ_max=${fmtVal(pt.radius, system, 'stress', 3)}`, { size: 10, fill: COLORS.ink }));
@@ -324,7 +335,7 @@ export function drawEnvelope(svg, pt, sigmaY, system) {
   if (m > axisMax) { const f = axisMax / m; s1 *= f; s2 *= f; clamped = true; }
 
   g.appendChild(el('line', { x1: cx, y1: cy, x2: X(s1), y2: Y(s2), stroke: pColor, 'stroke-width': 1, 'stroke-opacity': 0.5 }));
-  g.appendChild(el('circle', { cx: X(s1), cy: Y(s2), r: clamped ? 4 : 5.5, fill: pColor, stroke: '#fff', 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx: X(s1), cy: Y(s2), r: clamped ? 4 : 5.5, fill: pColor, stroke: COLORS.halo, 'stroke-width': 1.5 }));
   if (clamped) g.appendChild(txt(X(s1), Y(s2) - 9, '↗ off-scale', { size: 9, fill: pColor }));
 
   // Status + legend.

@@ -4,7 +4,7 @@
 import { computeDerived } from './beam.js';
 import { MATERIALS, findMaterial } from './materials.js';
 import { toCanonical, fromCanonical, unitLabel, fmtVal, fmtNum } from './units.js';
-import { COLORS, drawBeam, drawDiagram, drawSection, drawMohr, drawEnvelope } from './plots.js';
+import { COLORS, refreshColors, drawBeam, drawDiagram, drawSection, drawMohr, drawEnvelope } from './plots.js';
 
 const BEAM_PAD_X = 60; // must match padX inside drawBeam for pointer->x mapping
 
@@ -38,6 +38,7 @@ const materialSelect = $('material-select');
 const ENum = $('E-num');
 const sigmaYNum = $('sigmaY-num');
 const unitToggle = $('unit-toggle');
+const themeToggle = $('theme-toggle');
 const cutStatus = $('cut-status');
 const unpinBtn = $('unpin-btn');
 const fosValue = $('fos-value');
@@ -148,6 +149,39 @@ function refreshUnitDisplays() {
   });
   for (const c of numCtrls) c.num.value = inputStr(fromCanonical(state[c.key], state.unitSystem, c.cat));
   refreshMaterialInputs();
+}
+
+// ───────────────────────── Theme ─────────────────────────
+const THEME_KEY = 'beam-theme';
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  // Glyph shows the action: moon = "switch to dark", sun = "switch to light".
+  if (themeToggle) themeToggle.textContent = theme === 'dark' ? '☀' : '🌙';
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  applyTheme(saved ?? (prefersDark.matches ? 'dark' : 'light'));
+}
+
+function wireThemeToggle() {
+  if (!themeToggle) return;
+  themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+    refreshColors();
+    scheduleRender();
+  });
+  // Follow the OS theme live, until the user makes an explicit choice.
+  prefersDark.addEventListener('change', (e) => {
+    if (localStorage.getItem(THEME_KEY)) return;
+    applyTheme(e.matches ? 'dark' : 'light');
+    refreshColors();
+    scheduleRender();
+  });
 }
 
 // ───────────────────────── Cut interaction ─────────────────────────
@@ -285,6 +319,9 @@ function render() {
 
 // ───────────────────────── Init ─────────────────────────
 function init() {
+  initTheme();
+  refreshColors();        // populate COLORS from CSS vars before the first draw
+  wireThemeToggle();
   buildNumControls();
   buildMaterials();
   buildUnitToggle();

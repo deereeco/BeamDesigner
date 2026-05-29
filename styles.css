@@ -161,16 +161,49 @@ html, body {
 }
 .seg button.active { background: var(--accent); color: #fff; }
 
-/* Numeric slider + number controls (injected) */
-.num-ctrl { margin-bottom: 9px; }
+/* Numeric slider + number controls (injected) — 2-col grid so the tick labels
+   sit under the slider only, not the number box. */
+.num-ctrl {
+  display: grid;
+  grid-template-columns: 1fr 78px;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+  margin-bottom: 9px;
+}
 .num-ctrl:last-child { margin-bottom: 0; }
-.num-ctrl > label { display: block; font-size: .85rem; margin-bottom: 4px; }
-.num-line { display: flex; align-items: center; gap: 8px; }
-.num-line input[type="range"] { flex: 1; accent-color: var(--accent); }
-.num-line input[type="number"] {
+.num-ctrl[hidden] { display: none; }
+
+.num-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
+.num-head label { font-size: .85rem; }
+.mini-reset {
+  margin-left: auto;
+  border: 0; background: transparent; color: var(--accent);
+  font-size: 1rem; line-height: 1; padding: 0 2px; cursor: pointer;
+}
+.mini-reset[hidden] { display: none; }
+.mini-reset:hover { color: var(--ink); }
+
+.slider-wrap { position: relative; display: flex; align-items: center; }
+.slider-wrap input[type="range"] { flex: 1; accent-color: var(--accent); margin: 0; }
+.slider-marker {
+  position: absolute; top: 50%; left: 0;
+  width: 7px; height: 7px; margin-top: -4px;
+  background: var(--muted); opacity: .9;
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.slider-marker[hidden] { display: none; }
+
+.num-ctrl input[type="number"] {
   width: 78px; padding: 5px 7px;
   border: 1px solid var(--line-strong); border-radius: 7px;
   font: inherit; background: var(--field); color: var(--ink);
+}
+.slider-ticks {
+  display: flex; justify-content: space-between;
+  font-size: .68rem; color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .cut-group .cut-status { margin: 0 0 8px; font-size: .8rem; color: var(--muted); }
@@ -181,6 +214,24 @@ html, body {
 }
 .btn:hover:not(:disabled) { background: var(--field-hover); }
 .btn:disabled { opacity: .5; cursor: default; }
+
+/* "Save material…" — quiet inline link styled button */
+.btn-link {
+  width: auto; margin-top: 6px; padding: 2px 0;
+  border: 0; background: transparent; color: var(--accent);
+  text-align: left; font-size: .82rem;
+}
+.btn-link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+.btn-link[hidden] { display: none; }
+
+/* Drive-by (delta / force) toggle row */
+.drive-row { margin-bottom: 9px; }
+
+/* Design group: Save / Reset / Copy-link */
+.design-actions { display: flex; gap: 6px; }
+.design-actions .btn { flex: 1; min-width: 0; padding: 6px 4px; font-size: .82rem; }
+.design-hint { margin: 8px 0 0; font-size: .76rem; color: var(--muted); }
+.design-hint.copied { color: var(--safe); }
 
 /* Factor of safety badge */
 .fos-badge { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; }

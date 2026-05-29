@@ -1,6 +1,7 @@
-// Pure mechanics for a fixed-fixed (clamped-clamped) prismatic beam loaded by a
-// prescribed central displacement delta. All quantities in canonical units
-// (mm, N, MPa, N*mm). No UI, no unit conversion here.
+// Pure mechanics for a fixed-fixed (clamped-clamped) prismatic beam loaded at the
+// center, driven either by a prescribed central displacement delta or by an applied
+// central force P (linked by delta = P L^3 / (192 E I)). All quantities in canonical
+// units (mm, N, MPa, N*mm). No UI, no unit conversion here.
 
 const EPS = 1e-9;
 
@@ -55,7 +56,7 @@ export function stressState(sigmaX, tauXY, sigmaY) {
 
 // Compute everything the UI needs from the current state. Pure function of state.
 export function computeDerived(state) {
-  const { L, b, h, delta } = state;
+  const { L, b, h } = state;
   const E = state.material.E;       // MPa
   const sigmaY = state.material.sigmaY; // MPa
 
@@ -64,8 +65,17 @@ export function computeDerived(state) {
   const A = b * h;                  // mm^2
   const c = h / 2;                  // mm (extreme fiber distance)
 
-  // Equivalent central load from the prescribed displacement: delta = P L^3 / (192 E I).
-  const P = (192 * E * I * delta) / (L * L * L); // N
+  // Load model: in 'force' mode the applied central load P is the input and the
+  // resulting displacement is derived; otherwise the prescribed displacement delta
+  // is the input and P is back-calculated. Linked by delta = P L^3 / (192 E I).
+  let P, delta;
+  if (state.driveMode === 'force') {
+    P = state.P;
+    delta = (P * L * L * L) / (192 * E * I);
+  } else {
+    delta = state.delta;
+    P = (192 * E * I * delta) / (L * L * L);
+  }
   const R = P / 2;                  // N, reaction at each wall
   const Mwall = (P * L) / 8;        // N*mm, |moment| at walls and center
 
@@ -111,7 +121,7 @@ export function computeDerived(state) {
   );
 
   return {
-    I, A, c, P, R, Mwall,
+    I, A, c, P, R, Mwall, delta,
     xEval, Mx, Vx,
     pointNA, pointFiber,
     diagram: { xs, Ms, Vs },

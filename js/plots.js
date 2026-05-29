@@ -76,8 +76,8 @@ export function drawBeam(svg, state, d, system) {
   const beamHalf = 15;
   const midY = padTop + 4 + beamHalf;
   const maxDefl = Math.max(10, (h - padBot - beamHalf) - midY - 14);
-  const sat = Math.abs(state.delta) / (Math.abs(state.delta) + 3); // saturating 0..1
-  const amp = maxDefl * sat * (state.delta >= 0 ? 1 : -1);
+  const sat = Math.abs(d.delta) / (Math.abs(d.delta) + 3); // saturating 0..1
+  const amp = maxDefl * sat * (d.delta >= 0 ? 1 : -1);
   const yCenter = (x) => midY + amp * shapeNorm(x, L);
 
   // Walls (clamped supports) at both ends — gray block + diagonal hatch.
@@ -112,7 +112,7 @@ export function drawBeam(svg, state, d, system) {
     g.appendChild(el('line', { x1: xc, y1: midY, x2: xc, y2: yEnd, stroke: COLORS.ink, 'stroke-width': 1.5 }));
     const dir = amp >= 0 ? 1 : -1;
     g.appendChild(el('path', { d: `M${xc - 4} ${yEnd - 7 * dir} L${xc} ${yEnd} L${xc + 4} ${yEnd - 7 * dir} Z`, fill: COLORS.ink }));
-    g.appendChild(txt(xc + 8, (midY + yEnd) / 2, `δ = ${fmtVal(state.delta, system, 'length', 3)}`, { anchor: 'start', size: 10, fill: COLORS.ink }));
+    g.appendChild(txt(xc + 8, (midY + yEnd) / 2, `δ = ${fmtVal(d.delta, system, 'length', 3)}`, { anchor: 'start', size: 10, fill: COLORS.ink }));
   }
 
   // End ticks.

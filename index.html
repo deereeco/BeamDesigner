@@ -54,16 +54,28 @@
           <label for="sigmaY-num">σ<sub>Y</sub> (<span data-unit-label="stress">MPa</span>)</label>
           <input type="number" id="sigmaY-num" step="any" min="0" />
         </div>
+        <button type="button" id="save-material-btn" class="btn btn-link" hidden>Save material…</button>
       </section>
 
       <section class="ctrl-group" id="geometry-controls">
         <h2>Geometry &amp; load</h2>
+        <div class="ctrl-row drive-row">
+          <span class="ctrl-label">Drive by</span>
+          <div class="seg" id="drive-toggle" role="group" aria-label="Load drive mode">
+            <button type="button" data-drive="delta" class="active">δ</button>
+            <button type="button" data-drive="force">Force</button>
+          </div>
+        </div>
         <!-- numeric controls injected here by app.js -->
       </section>
 
       <section class="ctrl-group cut-group">
         <h2>Cut location</h2>
         <p class="cut-status" id="cut-status">Hover the beam to move the cut; click to pin.</p>
+        <div class="ctrl-row">
+          <label for="cut-num">x (<span data-unit-label="length">mm</span>)</label>
+          <input type="number" id="cut-num" step="any" min="0" />
+        </div>
         <button type="button" id="unpin-btn" class="btn" disabled>Unpin (follow cursor)</button>
       </section>
 
@@ -73,6 +85,16 @@
           <span class="fos-value" id="fos-value">—</span>
           <span class="fos-state" id="fos-state"></span>
         </div>
+      </section>
+
+      <section class="ctrl-group design-group">
+        <h2>Design</h2>
+        <div class="design-actions">
+          <button type="button" id="save-design-btn" class="btn">Save</button>
+          <button type="button" id="reset-design-btn" class="btn" disabled>Reset</button>
+          <button type="button" id="copy-link-btn" class="btn">Copy link</button>
+        </div>
+        <p class="design-hint" id="design-hint">Save the current inputs as your baseline, then explore freely.</p>
       </section>
     </aside>
 

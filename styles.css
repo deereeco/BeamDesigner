@@ -279,8 +279,6 @@ html, body {
   gap: 6px 14px;
 }
 .ro-group { border-left: 3px solid var(--line-strong); padding-left: 8px; }
-.ro-group.na { border-color: var(--na); }
-.ro-group.fiber { border-color: var(--fiber); }
 .ro-group h4 { margin: 0 0 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .ro-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
 .ro-table th, .ro-table td { padding: 0; line-height: 1.35; vertical-align: baseline; }

@@ -68,8 +68,6 @@ const designHint = $('design-hint');
 const fosValue = $('fos-value');
 const fosState = $('fos-state');
 const readouts = $('readouts');
-const naSub = $('na-sub');
-const fiberSub = $('fiber-sub');
 
 const DESIGN_HINT_DEFAULT = designHint ? designHint.textContent : '';
 
@@ -565,17 +563,7 @@ function updateReadouts(d) {
     tbl('At cut', '',
       row('x', fv(d.xEval, 'length')) +
       row('M(x)', fv(d.Mx, 'moment')) +
-      row('V(x)', fv(d.Vx, 'force'))) +
-    tbl('Neutral axis (shear)', 'na',
-      row('τ', fv(d.pointNA.tau, 'stress')) +
-      row('σ₁ / σ₂', `${fv(d.pointNA.s1, 'stress')} / ${fv(d.pointNA.s2, 'stress')}`) +
-      row('σ_vM', fv(d.pointNA.vM, 'stress')) +
-      row('FoS vM / Tr', `${fmtNum(d.pointNA.fosVM, 3)} / ${fmtNum(d.pointNA.fosT, 3)}`)) +
-    tbl('Extreme fiber (bending)', 'fiber',
-      row('σₓ', fv(d.pointFiber.sigma_x, 'stress')) +
-      row('σ₁ / σ₂', `${fv(d.pointFiber.s1, 'stress')} / ${fv(d.pointFiber.s2, 'stress')}`) +
-      row('σ_vM', fv(d.pointFiber.vM, 'stress')) +
-      row('FoS vM / Tr', `${fmtNum(d.pointFiber.fosVM, 3)} / ${fmtNum(d.pointFiber.fosT, 3)}`));
+      row('V(x)', fv(d.Vx, 'force')));
 }
 
 function updateFoS(d) {
@@ -588,12 +576,6 @@ function updateFoS(d) {
   fosValue.style.color = color;
   fosState.textContent = label;
   fosState.style.color = color;
-}
-
-function updateSubs(d) {
-  const s = state.unitSystem;
-  naSub.textContent = `σ = 0, τ = ${fmtVal(d.pointNA.tau, s, 'stress', 3)}`;
-  fiberSub.textContent = `σ = ${fmtVal(d.pointFiber.sigma_x, s, 'stress', 3)}, τ = 0`;
 }
 
 // ───────────────────────── Render ─────────────────────────
@@ -623,7 +605,6 @@ function render() {
 
   updateReadouts(d);
   updateFoS(d);
-  updateSubs(d);
   updateCutUI();
 }
 

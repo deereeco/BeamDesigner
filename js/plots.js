@@ -65,10 +65,15 @@ function niceStep(x) {
   return nf * Math.pow(10, e);
 }
 
+// Horizontal padding for the beam strip (room for end walls/labels). Exported so
+// app.js beamXFromEvent uses the identical value — keeps the pointer→x mapping exact
+// at any beam width (the strip is now in the narrower left column).
+export function beamPadX(w) { return Math.max(28, Math.min(60, w * 0.10)); }
+
 // ───────────────────────── Beam strip ─────────────────────────
 export function drawBeam(svg, state, d, system) {
   const { w, h, g } = setup(svg);
-  const padX = 60, padTop = 34, padBot = 26;
+  const padX = beamPadX(w), padTop = 34, padBot = 26;
   const x0 = padX, x1 = w - padX, plotW = Math.max(1, x1 - x0);
   const L = state.L;
   const toPx = (x) => x0 + (x / L) * plotW;
@@ -237,6 +242,80 @@ export function drawSection(svg, d, system) {
   g.appendChild(txt(colAx - 4, toY(c), '+c', { anchor: 'end', size: 9, baseline: 'middle' }));
   g.appendChild(txt(colAx - 4, toY(0), '0', { anchor: 'end', size: 9, baseline: 'middle' }));
   g.appendChild(txt(colAx - 4, toY(-c), '−c', { anchor: 'end', size: 9, baseline: 'middle' }));
+
+  svg.appendChild(g);
+}
+
+// ───────────────────────── Cross-section dimensions (to scale) ─────────────────────────
+// A true b:h-aspect rectangle with engineering dimension lines, redrawn live as b/h change.
+// For extreme aspect ratios the thin side is clamped to a minimum pixel width so it stays
+// visible (with a "(not to scale)" note); the labels always report the true values.
+function arrowTri(g, x, y, dir, color) {
+  const a = 5, b = 2.6; // length, half-width
+  let d;
+  if (dir === 'R') d = `M${x} ${y} L${x - a} ${y - b} L${x - a} ${y + b} Z`;
+  else if (dir === 'L') d = `M${x} ${y} L${x + a} ${y - b} L${x + a} ${y + b} Z`;
+  else if (dir === 'D') d = `M${x} ${y} L${x - b} ${y - a} L${x + b} ${y - a} Z`;
+  else d = `M${x} ${y} L${x - b} ${y + a} L${x + b} ${y + a} Z`; // 'U'
+  g.appendChild(el('path', { d, fill: color }));
+}
+function drawDimLineH(g, x1, x2, y) {
+  g.appendChild(el('line', { x1, y1: y, x2, y2: y, stroke: COLORS.axis, 'stroke-width': 1 }));
+  arrowTri(g, x1, y, 'L', COLORS.axis);
+  arrowTri(g, x2, y, 'R', COLORS.axis);
+}
+function drawDimLineV(g, y1, y2, x) {
+  g.appendChild(el('line', { x1: x, y1, x2: x, y2, stroke: COLORS.axis, 'stroke-width': 1 }));
+  arrowTri(g, x, y1, 'U', COLORS.axis);
+  arrowTri(g, x, y2, 'D', COLORS.axis);
+}
+
+export function drawSectionDims(svg, state, system) {
+  const { w, h, g } = setup(svg);
+  const b = Math.max(1e-6, state.b), hh = Math.max(1e-6, state.h); // canonical mm
+
+  // Annotation insets: room for the vertical dim (left) + horizontal dim (below).
+  const mL = 56, mR = 18, mT = 18, mB = 44;
+  const availW = Math.max(10, w - mL - mR);
+  const availH = Math.max(10, h - mT - mB);
+
+  // Fit the true aspect ratio, then clamp a degenerate thin side to a visible minimum.
+  const aspect = b / hh; // width / height
+  let rw, rh;
+  if (availW / availH > aspect) { rh = availH; rw = rh * aspect; } // height-limited
+  else { rw = availW; rh = rw / aspect; }                          // width-limited
+  const MINPX = 10;
+  let notToScale = false;
+  if (rw < MINPX) { rw = MINPX; notToScale = true; }
+  if (rh < MINPX) { rh = MINPX; notToScale = true; }
+
+  const rx = mL + (availW - rw) / 2;
+  const ry = mT + (availH - rh) / 2;
+
+  // Rectangle + neutral axis.
+  g.appendChild(el('rect', { x: rx, y: ry, width: rw, height: rh, fill: COLORS.sectionFill, stroke: COLORS.bandStroke, 'stroke-width': 1.4 }));
+  g.appendChild(el('line', { x1: rx, y1: ry + rh / 2, x2: rx + rw, y2: ry + rh / 2, stroke: COLORS.na, 'stroke-dasharray': '4 3', 'stroke-width': 1 }));
+
+  // Width dimension (b) below the rectangle.
+  const dimY = ry + rh + 22;
+  g.appendChild(el('line', { x1: rx, y1: ry + rh, x2: rx, y2: dimY + 5, stroke: COLORS.axis, 'stroke-width': 1 }));
+  g.appendChild(el('line', { x1: rx + rw, y1: ry + rh, x2: rx + rw, y2: dimY + 5, stroke: COLORS.axis, 'stroke-width': 1 }));
+  drawDimLineH(g, rx, rx + rw, dimY);
+  g.appendChild(txt(rx + rw / 2, dimY - 5, `b = ${fmtVal(b, system, 'length', 3)}`, { anchor: 'middle', size: 11, fill: COLORS.ink, weight: 600 }));
+
+  // Height dimension (h) left of the rectangle (rotated label).
+  const dimX = rx - 26;
+  g.appendChild(el('line', { x1: rx, y1: ry, x2: dimX - 5, y2: ry, stroke: COLORS.axis, 'stroke-width': 1 }));
+  g.appendChild(el('line', { x1: rx, y1: ry + rh, x2: dimX - 5, y2: ry + rh, stroke: COLORS.axis, 'stroke-width': 1 }));
+  drawDimLineV(g, ry, ry + rh, dimX);
+  const hy = ry + rh / 2;
+  g.appendChild(el('text', {
+    x: dimX - 6, y: hy, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    'font-size': 11, fill: COLORS.ink, 'font-weight': 600,
+    transform: `rotate(-90 ${dimX - 6} ${hy})`,
+  }, `h = ${fmtVal(hh, system, 'length', 3)}`));
+
+  if (notToScale) g.appendChild(txt(rx + rw / 2, ry - 6, '(not to scale)', { size: 9, fill: COLORS.muted }));
 
   svg.appendChild(g);
 }

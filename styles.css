@@ -117,6 +117,10 @@ html, body {
   gap: 10px;
   position: sticky;
   top: 12px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 .ctrl-group {
   background: var(--panel);
@@ -256,32 +260,37 @@ html, body {
 }
 .hint, .plot-sub { font-weight: 400; color: var(--muted); font-size: .78rem; }
 
-.svg-beam { width: 100%; height: 170px; display: block; touch-action: none; cursor: col-resize; outline: none; }
+.svg-beam { width: 100%; height: 150px; display: block; touch-action: none; cursor: col-resize; outline: none; }
 .svg-beam:focus-visible { box-shadow: 0 0 0 2px var(--accent); border-radius: 8px; }
-.svg-diagram { width: 100%; height: 94px; display: block; }
+.svg-diagram { width: 100%; height: 86px; display: block; }
 .svg-section { width: 100%; height: 236px; display: block; }
-.svg-plot { width: 100%; height: 244px; display: block; }
+.svg-section-dims { width: 100%; height: 240px; display: block; }
+.svg-plot { width: 100%; height: 220px; display: block; }
 
 .diagram-label { font-size: .78rem; color: var(--muted); margin: 4px 0 0; }
 
-.mid-row { display: grid; grid-template-columns: 1fr minmax(300px, 420px); gap: 12px; }
+/* Top region: left workspace column + narrower right (dimensions / stress) column. */
+.top-row { display: grid; grid-template-columns: 1fr minmax(300px, 380px); gap: 12px; align-items: start; }
+.col-left, .col-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
 .readouts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
 }
-.readout-block { border-left: 3px solid var(--line-strong); padding-left: 10px; }
-.readout-block.na { border-color: var(--na); }
-.readout-block.fiber { border-color: var(--fiber); }
-.readout-block h4 { margin: 0 0 4px; font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.readout-block .stat { display: flex; justify-content: space-between; gap: 10px; font-variant-numeric: tabular-nums; }
-.readout-block .stat span:first-child { color: var(--muted); }
+.ro-group { border-left: 3px solid var(--line-strong); padding-left: 8px; }
+.ro-group.na { border-color: var(--na); }
+.ro-group.fiber { border-color: var(--fiber); }
+.ro-group h4 { margin: 0 0 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ro-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.ro-table th, .ro-table td { padding: 0; line-height: 1.35; vertical-align: baseline; }
+.ro-table th { font-weight: 400; text-align: left; color: var(--muted); white-space: nowrap; padding-right: 10px; }
+.ro-table td { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; }
 
-.plot-grid { display: flex; flex-direction: column; gap: 12px; }
-.plot-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Full-width analysis band: four plots in one row (switch to repeat(2,1fr) for 2x2). */
+.plot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .plot-cell { min-width: 0; }
-.plot-title { font-size: .78rem; color: var(--muted); text-align: center; margin-bottom: 2px; }
+.plot-title { font-size: .78rem; color: var(--muted); text-align: center; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 
 .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
 .dot-na { background: var(--na); }
@@ -293,9 +302,14 @@ html, body {
 /* ───────────── Responsive ───────────── */
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { position: static; }
-  .mid-row { grid-template-columns: 1fr; }
-  .plot-pair { grid-template-columns: 1fr; }
+  .sidebar { position: static; max-height: none; overflow: visible; }
+  .top-row { grid-template-columns: 1fr; }
+  .plot-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 560px) {
+  .plot-grid { grid-template-columns: 1fr; }
+  .readouts { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

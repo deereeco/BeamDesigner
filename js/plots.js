@@ -361,8 +361,13 @@ export function drawMohr(svg, pt, sigmaY, color, system) {
   g.appendChild(el('circle', { cx: X(0), cy: Y(-pt.tau), r: 3, fill: color, 'fill-opacity': 0.4 }));
   g.appendChild(el('circle', { cx: X(pt.sigma_x), cy: Y(pt.tau), r: 4.5, fill: color, stroke: COLORS.halo, 'stroke-width': 1.5 }));
 
-  // Readouts.
-  g.appendChild(txt(cx, h - 6, `σ₁=${fmtVal(pt.s1, system, 'stress', 3)}  σ₂=${fmtVal(pt.s2, system, 'stress', 3)}  τ_max=${fmtVal(pt.radius, system, 'stress', 3)}`, { size: 10, fill: COLORS.ink }));
+  // Caption: driving stress + principals (consolidated from the former readout table;
+  // τ_max is the circle's radius, still shown geometrically).
+  const fvS = (v) => fmtVal(v, system, 'stress', 3);
+  const drive = (pt.tau !== 0 && pt.sigma_x === 0) ? `τ ${fvS(pt.tau)}`
+    : (pt.sigma_x !== 0 && pt.tau === 0) ? `σₓ ${fvS(pt.sigma_x)}`
+    : `σₓ ${fvS(pt.sigma_x)} · τ ${fvS(pt.tau)}`;
+  g.appendChild(txt(cx, h - 6, `${drive} · σ₁/σ₂ ${fvS(pt.s1)} / ${fvS(pt.s2)}`, { size: 10, fill: COLORS.ink }));
 
   svg.appendChild(g);
 }
@@ -421,7 +426,7 @@ export function drawEnvelope(svg, pt, sigmaY, system) {
   const statusText = region === 'yield' ? 'YIELDING (von Mises)'
     : region === 'tresca' ? 'Tresca exceeded · vM safe' : 'Safe';
   g.appendChild(txt(cx, 14, statusText, { size: 11, fill: pColor, weight: 700 }));
-  g.appendChild(txt(cx, h - 6, `vM ${fmtVal(pt.vM, system, 'stress', 3)} · FoS ${fmtNum(pt.fosVM, 3)} (vM) / ${fmtNum(pt.fosT, 3)} (Tr)`, { size: 10, fill: COLORS.ink }));
+  g.appendChild(txt(cx, h - 6, `σ_vM ${fmtVal(pt.vM, system, 'stress', 3)} · FoS ${fmtNum(pt.fosVM, 3)} (vM) / ${fmtNum(pt.fosT, 3)} (Tr)`, { size: 10, fill: COLORS.ink }));
 
   svg.appendChild(g);
 }

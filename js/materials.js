@@ -12,6 +12,10 @@ export const MATERIALS = [
   { name: 'Magnesium AZ31B',       E: 45000,  sigmaY: 200, nu: 0.35 },
   { name: 'Brass C360',            E: 97000,  sigmaY: 310, nu: 0.31 },
   { name: 'Copper (annealed)',     E: 117000, sigmaY: 70,  nu: 0.34 },
+  // Beryllium coppers (issue #7) — from ANSYS Granta export; room-temperature, temper as noted.
+  { name: 'Beryllium Copper C17000 (TH02)', E: 135500, sigmaY: 1147, nu: 0.34 },
+  { name: 'Beryllium Copper C17200 (TH04)', E: 134800, sigmaY: 1048, nu: 0.28 },
+  { name: 'Beryllium Copper C17500 (TF00)', E: 134400, sigmaY: 643,  nu: 0.34 },
   { name: 'Polycarbonate',         E: 2300,   sigmaY: 62,  nu: 0.37 },
   { name: 'Custom',                E: 200000, sigmaY: 250, nu: 0.30, custom: true },
 ];

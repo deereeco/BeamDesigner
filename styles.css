@@ -262,7 +262,7 @@ html, body {
 
 .svg-beam { width: 100%; height: 150px; display: block; touch-action: none; cursor: col-resize; outline: none; }
 .svg-beam:focus-visible { box-shadow: 0 0 0 2px var(--accent); border-radius: 8px; }
-.svg-diagram { width: 100%; height: 86px; display: block; }
+.svg-diagram { width: 100%; height: 86px; display: block; touch-action: none; cursor: col-resize; }
 .svg-section { width: 100%; height: 236px; display: block; }
 .svg-section-dims { width: 100%; height: 240px; display: block; }
 .svg-plot { width: 100%; height: 220px; display: block; }

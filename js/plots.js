@@ -70,6 +70,10 @@ function niceStep(x) {
 // at any beam width (the strip is now in the narrower left column).
 export function beamPadX(w) { return Math.max(28, Math.min(60, w * 0.10)); }
 
+// Horizontal padding for the shear/moment diagrams (symmetric, fixed). Exported so
+// app.js diagramXFromEvent uses the identical value — keeps the pointer→x mapping exact.
+export const DIAGRAM_PAD_X = 56;
+
 // ───────────────────────── Beam strip ─────────────────────────
 export function drawBeam(svg, state, d, system) {
   const { w, h, g } = setup(svg);
@@ -152,9 +156,9 @@ export function drawBeam(svg, state, d, system) {
 }
 
 // ───────────────────────── Shear / Moment diagrams ─────────────────────────
-export function drawDiagram(svg, d, key, system) {
+export function drawDiagram(svg, state, d, key, system) {
   const { w, h, g } = setup(svg);
-  const padX = 56, padT = 12, padB = 14;
+  const padX = DIAGRAM_PAD_X, padT = 12, padB = 14;
   const x0 = padX, x1 = w - padX, plotW = Math.max(1, x1 - x0);
   const xs = d.diagram.xs;
   const arr = key === 'M' ? d.diagram.Ms : d.diagram.Vs;
@@ -181,9 +185,20 @@ export function drawDiagram(svg, d, key, system) {
   g.appendChild(el('path', { d: area, fill: color, 'fill-opacity': 0.14 }));
   g.appendChild(el('path', { d: polyPath(pts), fill: 'none', stroke: color, 'stroke-width': 1.8 }));
 
-  // Cursor synced to evaluation location.
+  // Hover preview (faint) when pinned and hovering elsewhere — mirrors drawBeam.
+  const pinned = state.cut.xPinned != null;
+  if (pinned && state.cut.xHover != null && Math.abs(state.cut.xHover - state.cut.xPinned) > 1) {
+    const hx = toPx(Math.min(L, Math.max(0, state.cut.xHover)));
+    g.appendChild(el('line', { x1: hx, y1: padT, x2: hx, y2: h - padB, stroke: COLORS.muted, 'stroke-width': 1, 'stroke-dasharray': '3 4' }));
+  }
+  // Cut line synced to the evaluation location: bold/solid when pinned, light/dashed when hovering.
   const cx = toPx(d.xEval);
-  g.appendChild(el('line', { x1: cx, y1: padT, x2: cx, y2: h - padB, stroke: COLORS.accent, 'stroke-width': 1.2, 'stroke-dasharray': '4 3' }));
+  g.appendChild(el('line', {
+    x1: cx, y1: padT, x2: cx, y2: h - padB,
+    stroke: pinned ? COLORS.accent : COLORS.cut,
+    'stroke-width': pinned ? 2.2 : 1.2,
+    'stroke-dasharray': pinned ? null : '4 3',
+  }));
 
   // Peak labels.
   const peak = key === 'M' ? d.Mmax : d.Vmax;

@@ -7,7 +7,7 @@
 import { computeDerived } from './beam.js';
 import { MATERIALS, findMaterial, getUserMaterials, saveUserMaterial } from './materials.js';
 import { toCanonical, fromCanonical, unitLabel, fmtVal, fmtNum } from './units.js';
-import { COLORS, refreshColors, drawBeam, drawDiagram, drawSection, drawSectionDims, drawMohr, drawEnvelope, beamPadX } from './plots.js';
+import { COLORS, refreshColors, drawBeam, drawDiagram, drawSection, drawSectionDims, drawMohr, drawEnvelope, beamPadX, DIAGRAM_PAD_X } from './plots.js';
 
 // ───────────────────────── Defaults & State ─────────────────────────
 const DEF_MAT = MATERIALS[0]; // Steel (mild, A36)
@@ -450,25 +450,44 @@ function beamXFromEvent(evt) {
   const frac = clamp((px - x0) / Math.max(1, x1 - x0), 0, 1);
   return frac * state.L;
 }
-function wireBeam() {
-  beamSvg.addEventListener('pointermove', (e) => {
-    state.cut.xHover = beamXFromEvent(e);
+function diagramXFromEvent(evt, svg) {
+  const rect = svg.getBoundingClientRect();
+  const padX = DIAGRAM_PAD_X; // identical to drawDiagram's padX → exact pointer mapping
+  const x0 = padX, x1 = rect.width - padX;
+  const px = evt.clientX - rect.left;
+  const frac = clamp((px - x0) / Math.max(1, x1 - x0), 0, 1);
+  return frac * state.L;
+}
+// Shared hover/click cut interaction for any x-axis panel (beam + diagrams). Panels differ
+// only in how a pointer maps to a beam x, passed in as xFromEvent. Hover just re-renders
+// (never persists); clicking pins, which commits via onInput().
+function wireCutPointer(svg, xFromEvent) {
+  svg.addEventListener('pointermove', (e) => {
+    state.cut.xHover = xFromEvent(e);
     scheduleRender();
   });
-  beamSvg.addEventListener('pointerleave', () => {
+  svg.addEventListener('pointerleave', () => {
     state.cut.xHover = null;
     scheduleRender();
   });
-  beamSvg.addEventListener('click', (e) => {
-    state.cut.xPinned = beamXFromEvent(e);
+  svg.addEventListener('click', (e) => {
+    state.cut.xPinned = xFromEvent(e);
     state.cut.xHover = state.cut.xPinned;
     onInput();
   });
-  beamSvg.addEventListener('keydown', onBeamKey);
+}
+function wireBeam() {
+  wireCutPointer(beamSvg, beamXFromEvent);
+  beamSvg.addEventListener('keydown', onBeamKey); // keyboard/ARIA slider stays beam-only
   unpinBtn.addEventListener('click', () => {
     state.cut.xPinned = null;
     onInput();
   });
+}
+function wireDiagrams() {
+  for (const svg of [shearSvg, momentSvg]) {
+    wireCutPointer(svg, (e) => diagramXFromEvent(e, svg));
+  }
 }
 function onBeamKey(e) {
   const L = state.L;
@@ -502,7 +521,7 @@ function updateCutUI() {
   unpinBtn.disabled = !pinned;
   cutStatus.textContent = pinned
     ? `Pinned at x = ${fmtVal(state.cut.xPinned, state.unitSystem, 'length', 3)}. Change variables to watch this section respond.`
-    : 'Hover the beam to move the cut; click to pin.';
+    : 'Hover the beam or diagrams to move the cut; click to pin.';
   if (document.activeElement !== cutNum) {
     cutNum.value = inputStr(fromCanonical(state.cut.xPinned ?? state.L / 2, state.unitSystem, 'length'));
   }
@@ -594,8 +613,8 @@ function render() {
   const sys = state.unitSystem;
 
   drawBeam(beamSvg, state, d, sys);
-  drawDiagram(shearSvg, d, 'V', sys);
-  drawDiagram(momentSvg, d, 'M', sys);
+  drawDiagram(shearSvg, state, d, 'V', sys);
+  drawDiagram(momentSvg, state, d, 'M', sys);
   drawSection(sectionSvg, d, sys);
   drawSectionDims(sectionDimsSvg, state, sys);
   drawMohr(mohrNaSvg, d.pointNA, d.sigmaY, COLORS.na, sys);
@@ -630,6 +649,7 @@ function init() {
   buildDesignToolbar();
   wireCutBox();
   wireBeam();
+  wireDiagrams();
 
   // Load precedence: share-link hash > saved working state > defaults.
   const hashState = readHash();

@@ -1,7 +1,8 @@
 # Beam Designer
 
-An interactive, browser-based tool for exploring the **stress state of a fixed–fixed
-(clamped–clamped) beam** driven by a **prescribed center displacement**. Change the
+An interactive, browser-based tool for exploring the **stress state of a beam** — either a
+**fixed–fixed (clamped–clamped)** beam with a central load or a **cantilever** with a load at
+the free end — driven by a **prescribed displacement** or an applied force. Change the support,
 geometry, material, and displacement and watch the stress state move relative to the
 **von Mises** and **Tresca** yield envelopes in real time.
 
@@ -9,9 +10,11 @@ No build step, no dependencies — just static HTML/CSS/JS, ready for GitHub Pag
 
 ## What it does
 
-- Set beam **length, width, height, material** (steel / aluminum / titanium / custom),
-  and the imposed **center displacement δ**. The equivalent central load `P`, wall
-  reactions, and moments are derived automatically (`P = 192·E·I·δ / L³`).
+- Choose the **support** (fixed–fixed or cantilever), then set beam **length, width, height,
+  material** (steel / aluminum / titanium / custom) and the imposed **displacement δ** — at the
+  center for fixed–fixed, at the free end for a cantilever. The equivalent point load `P`, wall
+  reactions, and moments are derived automatically from `δ = P·L³ / (C·E·I)`, with `C = 192`
+  for fixed–fixed and `C = 3` for the cantilever.
 - **Hover** along the beam to move a cutting line; **click** to pin it. Once pinned, move
   the mouse to the sliders and watch that fixed cross-section respond live. Re-click to
   re-pin; `Esc`, the **Unpin** button, or arrow keys (when the beam is focused) also work.

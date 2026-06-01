@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Beam Designer — Fixed-Fixed Beam Stress Explorer</title>
+  <title>Beam Designer — Beam Stress Explorer</title>
   <!-- Apply the saved/system theme before first paint to avoid a flash. -->
   <script>
     (function () {
@@ -21,7 +21,7 @@
   <header class="app-header">
     <div class="header-titles">
       <h1>Beam Designer</h1>
-      <p class="subtitle">Fixed–fixed beam · prescribed center displacement · live stress &amp; yield state</p>
+      <p class="subtitle" id="subtitle">Fixed–fixed beam · prescribed center displacement · live stress &amp; yield state</p>
     </div>
     <button id="theme-toggle" class="theme-toggle" type="button"
             aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
@@ -59,6 +59,13 @@
 
       <section class="ctrl-group" id="geometry-controls">
         <h2>Geometry &amp; load</h2>
+        <div class="ctrl-row beam-row">
+          <span class="ctrl-label">Support</span>
+          <div class="seg" id="beam-toggle" role="group" aria-label="Support type">
+            <button type="button" data-beam="fixed-fixed" class="active">Fixed–fixed</button>
+            <button type="button" data-beam="cantilever">Cantilever</button>
+          </div>
+        </div>
         <div class="ctrl-row drive-row">
           <span class="ctrl-label">Drive by</span>
           <div class="seg" id="drive-toggle" role="group" aria-label="Load drive mode">

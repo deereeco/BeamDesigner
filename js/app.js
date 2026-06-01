@@ -4,7 +4,7 @@
 // boundary. Working state + a "baseline" design are persisted to localStorage and can
 // be shared via a URL hash.
 
-import { computeDerived } from './beam.js';
+import { computeDerived, BEAM_MODELS } from './beam.js';
 import { MATERIALS, findMaterial, getUserMaterials, saveUserMaterial } from './materials.js';
 import { toCanonical, fromCanonical, unitLabel, fmtVal, fmtNum } from './units.js';
 import { COLORS, refreshColors, drawBeam, drawDiagram, drawSection, drawSectionDims, drawMohr, drawEnvelope, beamPadX, DIAGRAM_PAD_X } from './plots.js';
@@ -14,7 +14,7 @@ const DEF_MAT = MATERIALS[0]; // Steel (mild, A36)
 
 // Full default payload (the same shape serializeState() produces).
 const DEFAULTS = {
-  L: 1000, b: 20, h: 40, delta: 2, P: 8192, driveMode: 'delta',
+  L: 1000, b: 20, h: 40, delta: 2, P: 8192, driveMode: 'delta', beamType: 'fixed-fixed',
   material: { name: DEF_MAT.name, E: DEF_MAT.E, sigmaY: DEF_MAT.sigmaY },
   unitSystem: 'SI', cutX: null,
 };
@@ -22,6 +22,7 @@ const DEFAULTS = {
 const state = {
   L: 1000, b: 20, h: 40, delta: 2, P: 8192, // mm / N
   driveMode: 'delta',                        // 'delta' | 'force'
+  beamType: 'fixed-fixed',                    // 'fixed-fixed' | 'cantilever'
   material: { ...DEF_MAT },                   // E, sigmaY in MPa
   unitSystem: 'SI',
   cut: { xPinned: null, xHover: null },       // mm; eval = pinned ?? hover ?? L/2
@@ -36,6 +37,15 @@ const NUM_CONTROLS = [
   { key: 'delta', label: 'Center displacement δ', cat: 'length', min: 0,   max: 20,   step: 0.1, hardMin: 0,   hardMax: 100000, mode: 'delta' },
   { key: 'P',     label: 'Central load P',        cat: 'force',  min: 0,   max: 50000, step: 50, hardMin: 0,   hardMax: 1e8,    mode: 'force' },
 ];
+
+// Per-support default slider ranges for the load-dependent controls (canonical mm / N). A
+// cantilever is far more flexible than a fixed-fixed beam (stiffness coeff 3 vs 192), so it
+// wants a larger δ scale and a smaller P scale; switching support resets these (the live
+// range still auto-expands if a value runs past them).
+const MODEL_RANGES = {
+  'fixed-fixed': { delta: { min: 0, max: 20, step: 0.1 }, P: { min: 0, max: 50000, step: 50 } },
+  cantilever:    { delta: { min: 0, max: 80, step: 0.5 }, P: { min: 0, max: 5000,  step: 25 } },
+};
 
 const STATE_KEY = 'beam-state';
 const BASELINE_KEY = 'beam-baseline';
@@ -57,7 +67,9 @@ const sigmaYNum = $('sigmaY-num');
 const saveMaterialBtn = $('save-material-btn');
 const unitToggle = $('unit-toggle');
 const driveToggle = $('drive-toggle');
+const beamToggle = $('beam-toggle');
 const themeToggle = $('theme-toggle');
+const subtitleEl = $('subtitle');
 const cutStatus = $('cut-status');
 const cutNum = $('cut-num');
 const unpinBtn = $('unpin-btn');
@@ -89,7 +101,7 @@ function designPayload() {
   return {
     L: roundCanon(state.L), b: roundCanon(state.b), h: roundCanon(state.h),
     delta: roundCanon(state.delta), P: roundCanon(state.P),
-    driveMode: state.driveMode,
+    driveMode: state.driveMode, beamType: state.beamType,
     material: { name: state.material.name, E: roundCanon(state.material.E), sigmaY: roundCanon(state.material.sigmaY) },
     cutX: state.cut.xPinned == null ? null : roundCanon(state.cut.xPinned),
   };
@@ -102,7 +114,7 @@ function defaultDesignPayload() {
   return {
     L: roundCanon(DEFAULTS.L), b: roundCanon(DEFAULTS.b), h: roundCanon(DEFAULTS.h),
     delta: roundCanon(DEFAULTS.delta), P: roundCanon(DEFAULTS.P),
-    driveMode: DEFAULTS.driveMode,
+    driveMode: DEFAULTS.driveMode, beamType: DEFAULTS.beamType,
     material: { name: DEF_MAT.name, E: roundCanon(DEF_MAT.E), sigmaY: roundCanon(DEF_MAT.sigmaY) },
     cutX: null,
   };
@@ -129,14 +141,19 @@ function applyState(p) {
 
   state.unitSystem = p.unitSystem === 'imperial' ? 'imperial' : (p.unitSystem === 'SI' ? 'SI' : state.unitSystem);
   state.driveMode = p.driveMode === 'force' ? 'force' : 'delta';
+  state.beamType = p.beamType === 'cantilever' ? 'cantilever' : 'fixed-fixed';
   state.material = materialFromPayload(p.material);
   state.cut.xPinned = isFinite(p.cutX) ? p.cutX : null;
   state.cut.xHover = null;
 
   refreshUnitToggleUI();
   refreshDriveToggleUI();
+  refreshBeamToggleUI();
   updateDriveVisibility();
   for (const ctl of numCtrls) setControlValue(ctl, pick(p[ctl.key], DEFAULTS[ctl.key]));
+  applyModelRanges(state.beamType);
+  refreshControlLabels();
+  updateSubtitle();
 
   materialSelect.value = findMaterialMerged(state.material.name) ? state.material.name : 'Custom';
   refreshMaterialInputs();
@@ -226,7 +243,7 @@ function buildNumControls() {
     const v0 = clamp(state[cfg.key], cfg.min, cfg.max);
     wrap.innerHTML = `
       <div class="num-head">
-        <label>${cfg.label} (<span data-unit-label="${cfg.cat}">${unitLabel(state.unitSystem, cfg.cat)}</span>)</label>
+        <label><span class="ctrl-name">${cfg.label}</span> (<span data-unit-label="${cfg.cat}">${unitLabel(state.unitSystem, cfg.cat)}</span>)</label>
         <button type="button" class="mini-reset" title="Reset to baseline" aria-label="Reset ${cfg.label} to baseline" hidden>↺</button>
       </div>
       <div class="slider-wrap">
@@ -245,6 +262,7 @@ function buildNumControls() {
       miniReset: wrap.querySelector('.mini-reset'),
       tickMin: wrap.querySelector('.tick-min'),
       tickMax: wrap.querySelector('.tick-max'),
+      nameEl: wrap.querySelector('.ctrl-name'),
     };
     numCtrls.push(ctl);
     updateTicks(ctl);
@@ -302,6 +320,50 @@ function updateDriveVisibility() {
   for (const ctl of numCtrls) {
     if (!ctl.mode) continue;
     ctl.el.hidden = ctl.mode !== state.driveMode;
+  }
+}
+
+// ───────────────────────── Beam-support toggle ─────────────────────────
+function buildBeamToggle() {
+  beamToggle.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.beam;
+      if (t === state.beamType) return;
+      state.beamType = t;
+      refreshBeamToggleUI();
+      applyModelRanges(t);     // rescale the δ/P sliders to the new support
+      refreshControlLabels();
+      updateSubtitle();
+      onInput();               // the active driving input stays; the derived one recomputes
+    });
+  });
+}
+function refreshBeamToggleUI() {
+  beamToggle.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.beam === state.beamType));
+}
+// Rewrite the δ / P control names from the active support model (center vs end wording).
+function refreshControlLabels() {
+  const model = BEAM_MODELS[state.beamType] || BEAM_MODELS['fixed-fixed'];
+  for (const ctl of numCtrls) {
+    const name = ctl.key === 'delta' ? model.dispLabel : ctl.key === 'P' ? model.loadLabel : ctl.label;
+    if (ctl.nameEl) ctl.nameEl.textContent = name;
+  }
+}
+function updateSubtitle() {
+  const model = BEAM_MODELS[state.beamType] || BEAM_MODELS['fixed-fixed'];
+  if (subtitleEl) subtitleEl.textContent = model.subtitle;
+}
+// Reset the load-dependent sliders (δ, P) to the support's default range; the current value
+// re-clamps and the range still auto-expands past these defaults when a value needs it.
+function applyModelRanges(beamType) {
+  const ranges = MODEL_RANGES[beamType] || MODEL_RANGES['fixed-fixed'];
+  for (const ctl of numCtrls) {
+    const r = ranges[ctl.key];
+    if (!r) continue;
+    ctl.min = r.min; ctl.max = r.max; ctl.step = r.step;
+    ctl.range.min = r.min; ctl.range.max = r.max; ctl.range.step = r.step;
+    setControlValue(ctl, state[ctl.key]);
+    updateTicks(ctl);
   }
 }
 
@@ -569,16 +631,17 @@ function buildDesignToolbar() {
 // ───────────────────────── Readouts ─────────────────────────
 function updateReadouts(d) {
   const s = state.unitSystem;
+  const m = d.model;
   const fv = (v, cat) => fmtVal(v, s, cat, 3);
   const row = (l, v) => `<tr><th>${l}</th><td>${v}</td></tr>`;
   const tbl = (title, cls, rows) =>
     `<div class="ro-group ${cls}"><h4>${title}</h4><table class="ro-table"><tbody>${rows}</tbody></table></div>`;
   readouts.innerHTML =
     tbl('Loading &amp; reactions', '',
-      row('Central load P', fv(d.P, 'force')) +
-      row('Center displacement δ', fv(d.delta, 'length')) +
+      row(m.loadLabel, fv(d.P, 'force')) +
+      row(m.dispLabel, fv(d.delta, 'length')) +
       row('Wall reaction R', fv(d.R, 'force')) +
-      row('|M| wall = center', fv(d.Mwall, 'moment'))) +
+      row(m.momentLabel, fv(d.Mwall, 'moment'))) +
     tbl('At cut', '',
       row('x', fv(d.xEval, 'length')) +
       row('M(x)', fv(d.Mx, 'moment')) +
@@ -644,6 +707,7 @@ function init() {
   wireThemeToggle();
   buildNumControls();
   buildDriveToggle();
+  buildBeamToggle();
   buildMaterials();
   buildUnitToggle();
   buildDesignToolbar();

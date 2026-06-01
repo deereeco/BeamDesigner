@@ -2,7 +2,6 @@
 // to the live pixel size (1 unit = 1 px, so nothing is distorted), clears it, and
 // rebuilds its contents. Cheap for these small drawings; called on every change.
 
-import { shapeNorm } from './beam.js';
 import { fmtVal, fmtNum, unitLabel } from './units.js';
 
 // Populated from CSS custom properties by refreshColors() so drawings follow the
@@ -87,11 +86,13 @@ export function drawBeam(svg, state, d, system) {
   const maxDefl = Math.max(10, (h - padBot - beamHalf) - midY - 14);
   const sat = Math.abs(d.delta) / (Math.abs(d.delta) + 3); // saturating 0..1
   const amp = maxDefl * sat * (d.delta >= 0 ? 1 : -1);
-  const yCenter = (x) => midY + amp * shapeNorm(x, L);
+  const model = d.model;
+  const yCenter = (x) => midY + amp * model.shapeNorm(x, L);
 
-  // Walls (clamped supports) at both ends — gray block + diagonal hatch.
+  // Walls (clamped supports) — gray block + diagonal hatch. Both ends for a fixed-fixed
+  // beam; the left end only for a cantilever (the right end is free).
   const wallW = 16, wallH = beamHalf + 14;
-  for (const side of ['L', 'R']) {
+  for (const side of model.walls) {
     const wx = side === 'L' ? x0 - wallW : x1;
     g.appendChild(el('rect', { x: wx, y: midY - wallH, width: wallW, height: 2 * wallH, fill: COLORS.wall }));
     for (let yy = -wallH; yy < wallH; yy += 6) {
@@ -115,13 +116,16 @@ export function drawBeam(svg, state, d, system) {
   const band = polyPath(top) + ' ' + bot.slice().reverse().map((p) => `L${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(' ') + ' Z';
   g.appendChild(el('path', { d: band, fill: COLORS.band, 'fill-opacity': 0.55, stroke: COLORS.bandStroke, 'stroke-width': 1.5 }));
 
-  // Displacement arrow at center (when deflected).
+  // Displacement arrow at the peak-deflection point (center for fixed-fixed, free tip for a
+  // cantilever), when deflected. Flip the label to the left when the arrow sits at the tip.
   if (Math.abs(amp) > 2) {
-    const xc = toPx(L / 2), yEnd = yCenter(L / 2);
+    const dispX = L * model.dispXFrac;
+    const xc = toPx(dispX), yEnd = yCenter(dispX);
     g.appendChild(el('line', { x1: xc, y1: midY, x2: xc, y2: yEnd, stroke: COLORS.ink, 'stroke-width': 1.5 }));
     const dir = amp >= 0 ? 1 : -1;
     g.appendChild(el('path', { d: `M${xc - 4} ${yEnd - 7 * dir} L${xc} ${yEnd} L${xc + 4} ${yEnd - 7 * dir} Z`, fill: COLORS.ink }));
-    g.appendChild(txt(xc + 8, (midY + yEnd) / 2, `δ = ${fmtVal(d.delta, system, 'length', 3)}`, { anchor: 'start', size: 10, fill: COLORS.ink }));
+    const nearRight = model.dispXFrac > 0.9;
+    g.appendChild(txt(nearRight ? xc - 8 : xc + 8, (midY + yEnd) / 2, `δ = ${fmtVal(d.delta, system, 'length', 3)}`, { anchor: nearRight ? 'end' : 'start', size: 10, fill: COLORS.ink }));
   }
 
   // End ticks.
@@ -163,8 +167,8 @@ export function drawDiagram(svg, state, d, key, system) {
   const xs = d.diagram.xs;
   const arr = key === 'M' ? d.diagram.Ms : d.diagram.Vs;
   const L = xs[xs.length - 1];
-  let maxAbs = 0;
-  for (const v of arr) maxAbs = Math.max(maxAbs, Math.abs(v));
+  let maxAbs = 0, vMin = Infinity, vMax = -Infinity;
+  for (const v of arr) { maxAbs = Math.max(maxAbs, Math.abs(v)); if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
   if (maxAbs < 1e-12) maxAbs = 1;
   const zeroY = padT + (h - padT - padB) / 2;
   const halfH = (h - padT - padB) / 2 - 3;
@@ -200,10 +204,11 @@ export function drawDiagram(svg, state, d, key, system) {
     'stroke-dasharray': pinned ? null : '4 3',
   }));
 
-  // Peak labels.
-  const peak = key === 'M' ? d.Mmax : d.Vmax;
-  g.appendChild(txt(x0 - 4, padT + 4, `+${fmtVal(peak, system, cat, 3)}`, { anchor: 'end', size: 9 }));
-  g.appendChild(txt(x0 - 4, h - padB - 2, `−${fmtVal(peak, system, cat, 3)}`, { anchor: 'end', size: 9 }));
+  // Peak labels — only on the side(s) the curve actually occupies. A cantilever's moment is
+  // one-signed (all hogging) and its shear is constant, so the opposite label is suppressed.
+  const tol = maxAbs * 1e-6;
+  if (vMax > tol) g.appendChild(txt(x0 - 4, padT + 4, `+${fmtVal(vMax, system, cat, 3)}`, { anchor: 'end', size: 9 }));
+  if (vMin < -tol) g.appendChild(txt(x0 - 4, h - padB - 2, `−${fmtVal(-vMin, system, cat, 3)}`, { anchor: 'end', size: 9 }));
 
   svg.appendChild(g);
 }

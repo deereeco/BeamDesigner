@@ -1,31 +1,77 @@
-// Pure mechanics for a fixed-fixed (clamped-clamped) prismatic beam loaded at the
-// center, driven either by a prescribed central displacement delta or by an applied
-// central force P (linked by delta = P L^3 / (192 E I)). All quantities in canonical
+// Pure mechanics for prismatic beams in two support conditions, driven either by a
+// prescribed displacement delta or by an applied point load P. All quantities in canonical
 // units (mm, N, MPa, N*mm). No UI, no unit conversion here.
+//
+//   BEAM_MODELS keys:
+//     'fixed-fixed' — clamped at both ends, central point load; delta at the center.
+//     'cantilever'  — clamped at the left wall (x=0), free at x=L, point load at the free
+//                     tip; delta at the tip.
+//   Both link load <-> displacement by  delta = P*L^3 / (C*E*I)  with C = stiffnessC
+//   (192 for fixed-fixed, 3 for the cantilever).
 
 const EPS = 1e-9;
 
-// Bending moment and shear at position x (origin at left wall), for a fixed-fixed
-// beam of length L with an equivalent central point load P.
-//   M(x) = (P/2)x - PL/8   for 0 <= x <= L/2   (mirror on the right half)
-//   V    = +P/2 for x < L/2,  -P/2 for x > L/2  (jump of P at the center)
-// Sign convention: sagging-positive moment, with M = -PL/8 at the walls and
-// +PL/8 at the center.
-export function beamMV(x, L, P) {
-  const half = L / 2;
-  if (x <= half) {
-    return { M: (P / 2) * x - (P * L) / 8, V: P / 2 };
-  }
-  const xr = L - x; // mirror coordinate from the right wall
-  return { M: (P / 2) * xr - (P * L) / 8, V: -P / 2 };
-}
+// ───────────────────────── Beam models ─────────────────────────
+// Each model captures everything load-case-specific: the delta<->P stiffness coefficient,
+// the internal-force field beamMV(x,L,P) -> {M, V} (sagging-positive M; V positive when the
+// left-of-cut segment pushes up), the normalized downward deflection shape shapeNorm(x,L) in
+// [0,1], the wall reaction, plus labels and beam-strip drawing metadata (which ends are
+// walls, and the fraction of L where peak displacement / the delta arrow sits).
 
-// Normalized deflected shape (downward-positive), 0 at the walls and 1 at the
-// center. v(x)/delta = 4 x^2 (3L - 4x) / L^3 for 0 <= x <= L/2 (mirror beyond).
-export function shapeNorm(x, L) {
-  const xm = x <= L / 2 ? x : L - x;
-  return (4 * xm * xm * (3 * L - 4 * xm)) / (L * L * L);
-}
+// Fixed-fixed (clamped-clamped), equivalent central point load P.
+//   M(x) = (P/2)x − PL/8 for 0 <= x <= L/2 (mirror on the right half); M = −PL/8 at the
+//   walls and +PL/8 at the center. V = +P/2 left of center, −P/2 right of center.
+//   Shape: v/delta = 4x^2(3L − 4x)/L^3 for 0 <= x <= L/2 (mirror beyond).
+const fixedFixed = {
+  id: 'fixed-fixed',
+  name: 'Fixed–fixed',
+  subtitle: 'Fixed–fixed beam · prescribed center displacement · live stress & yield state',
+  stiffnessC: 192,
+  walls: ['L', 'R'],
+  dispXFrac: 0.5,
+  loadLabel: 'Central load P',
+  dispLabel: 'Center displacement δ',
+  momentLabel: '|M| wall = center',
+  reaction: (P) => P / 2,
+  beamMV(x, L, P) {
+    const half = L / 2;
+    if (x <= half) {
+      return { M: (P / 2) * x - (P * L) / 8, V: P / 2 };
+    }
+    const xr = L - x; // mirror coordinate from the right wall
+    return { M: (P / 2) * xr - (P * L) / 8, V: -P / 2 };
+  },
+  shapeNorm(x, L) {
+    const xm = x <= L / 2 ? x : L - x;
+    return (4 * xm * xm * (3 * L - 4 * xm)) / (L * L * L);
+  },
+};
+
+// Cantilever clamped at the left wall (x=0), free at x=L, downward point load P at the
+// free tip. Verified against AmesWeb / EngineeringToolbox references:
+//   delta_tip = P*L^3 / (3*E*I);   M(x) = −P(L − x)  (hogging, −PL at the wall, 0 at the tip);
+//   V(x) = +P (constant);   v/delta = x^2(3L − x)/(2L^3)  (0 with slope 0 at the clamp, 1 at the tip).
+const cantilever = {
+  id: 'cantilever',
+  name: 'Cantilever',
+  subtitle: 'Cantilever beam · prescribed end displacement · live stress & yield state',
+  stiffnessC: 3,
+  walls: ['L'],
+  dispXFrac: 1,
+  loadLabel: 'End load P',
+  dispLabel: 'End displacement δ',
+  momentLabel: '|M| at wall',
+  reaction: (P) => P,
+  beamMV(x, L, P) {
+    return { M: -P * (L - x), V: P };
+  },
+  shapeNorm(x, L) {
+    return (x * x * (3 * L - x)) / (2 * L * L * L);
+  },
+};
+
+export const BEAM_MODELS = { 'fixed-fixed': fixedFixed, cantilever };
+export const DEFAULT_BEAM_TYPE = 'fixed-fixed';
 
 // Plane-stress state at a point (sigma_y = 0, sigma_3 = 0), returning principal
 // stresses, von Mises / Tresca equivalent stresses, and factors of safety.
@@ -59,31 +105,32 @@ export function computeDerived(state) {
   const { L, b, h } = state;
   const E = state.material.E;       // MPa
   const sigmaY = state.material.sigmaY; // MPa
+  const model = BEAM_MODELS[state.beamType] || BEAM_MODELS[DEFAULT_BEAM_TYPE];
 
   // Rectangular section properties.
   const I = (b * h * h * h) / 12;   // mm^4
   const A = b * h;                  // mm^2
   const c = h / 2;                  // mm (extreme fiber distance)
 
-  // Load model: in 'force' mode the applied central load P is the input and the
-  // resulting displacement is derived; otherwise the prescribed displacement delta
-  // is the input and P is back-calculated. Linked by delta = P L^3 / (192 E I).
+  // Load model: delta = P L^3 / (C E I). In 'force' mode the applied load P is the input
+  // and the displacement is derived; otherwise the prescribed displacement delta is the
+  // input and P is back-calculated. C is the support's stiffness coefficient.
+  const C = model.stiffnessC;
   let P, delta;
   if (state.driveMode === 'force') {
     P = state.P;
-    delta = (P * L * L * L) / (192 * E * I);
+    delta = (P * L * L * L) / (C * E * I);
   } else {
     delta = state.delta;
-    P = (192 * E * I * delta) / (L * L * L);
+    P = (C * E * I * delta) / (L * L * L);
   }
-  const R = P / 2;                  // N, reaction at each wall
-  const Mwall = (P * L) / 8;        // N*mm, |moment| at walls and center
+  const R = model.reaction(P);      // N, wall reaction
 
   // Evaluation location: pinned wins, else hover, else center. Clamp to the beam.
   let xEval = state.cut.xPinned ?? state.cut.xHover ?? L / 2;
   xEval = Math.min(L, Math.max(0, xEval));
 
-  const { M: Mx, V: Vx } = beamMV(xEval, L, P);
+  const { M: Mx, V: Vx } = model.beamMV(xEval, L, P);
   const absM = Math.abs(Mx);
   const absV = Math.abs(Vx);
 
@@ -96,14 +143,18 @@ export function computeDerived(state) {
   const sigmaFiber = (6 * absM) / (b * h * h);
   const pointFiber = stressState(sigmaFiber, 0, sigmaY);
 
-  // Diagrams along the length.
+  // Diagrams along the length; track the peak |M| and |V| for readouts.
   const N = 201;
   const xs = new Array(N), Ms = new Array(N), Vs = new Array(N);
+  let Mmax = 0, Vmax = 0;
   for (let i = 0; i < N; i++) {
     const x = (i / (N - 1)) * L;
-    const mv = beamMV(x, L, P);
+    const mv = model.beamMV(x, L, P);
     xs[i] = x; Ms[i] = mv.M; Vs[i] = mv.V;
+    Mmax = Math.max(Mmax, Math.abs(mv.M));
+    Vmax = Math.max(Vmax, Math.abs(mv.V));
   }
+  const Mwall = Mmax;               // peak |M| (at the wall for both supports)
 
   // Stress distribution through the depth at xEval (signed).
   const Ns = 41;
@@ -127,6 +178,7 @@ export function computeDerived(state) {
     diagram: { xs, Ms, Vs },
     sectionDist: { ys, sigmaXs, taus, sigmaFiber, tauNA },
     globalFoS, sigmaY,
-    Mmax: Mwall, Vmax: P / 2,
+    Mmax, Vmax,
+    model,
   };
 }

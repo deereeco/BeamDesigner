@@ -231,6 +231,13 @@ html, body {
 /* Drive-by (delta / force) toggle row */
 .drive-row { margin-bottom: 9px; }
 
+/* Support toggle: stack the label over full-width segmented buttons so the longer
+   "Fixed–fixed" / "Cantilever" labels never clip the .seg (overflow:hidden) at narrow widths. */
+.beam-row { flex-direction: column; align-items: stretch; gap: 6px; margin-bottom: 10px; }
+.beam-row .ctrl-label { font-weight: 600; }
+#beam-toggle { display: flex; }
+#beam-toggle button { flex: 1; }
+
 /* Design group: Save / Reset / Copy-link */
 .design-actions { display: flex; gap: 6px; }
 .design-actions .btn { flex: 1; min-width: 0; padding: 6px 4px; font-size: .82rem; }

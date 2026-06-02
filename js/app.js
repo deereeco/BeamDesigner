@@ -197,6 +197,7 @@ function refreshDirtyUI() {
     const base = baselineDesign ? baselineDesign[ctl.key] : state[ctl.key];
     ctl.miniReset.hidden = roundCanon(state[ctl.key]) === roundCanon(base);
     positionMarker(ctl);
+    refreshZoomBtn(ctl);
   }
 }
 
@@ -225,12 +226,74 @@ function positionMarker(ctl) {
   ctl.marker.style.left = clamp(frac, 0, 1) * 100 + '%';
 }
 function updateTicks(ctl) {
-  ctl.tickMin.textContent = inputStr(fromCanonical(+ctl.range.min, state.unitSystem, ctl.cat));
-  ctl.tickMax.textContent = inputStr(fromCanonical(+ctl.range.max, state.unitSystem, ctl.cat));
+  // tickMin/tickMax are editable inputs; don't clobber the one being typed into.
+  if (document.activeElement !== ctl.tickMin) ctl.tickMin.value = inputStr(fromCanonical(+ctl.range.min, state.unitSystem, ctl.cat));
+  if (document.activeElement !== ctl.tickMax) ctl.tickMax.value = inputStr(fromCanonical(+ctl.range.max, state.unitSystem, ctl.cat));
 }
 function resetControl(ctl) {
   if (!baselineDesign) return;
   setControlValue(ctl, baselineDesign[ctl.key]);
+  onInput();
+}
+
+// ───────────────────────── Slider range control ─────────────────────────
+// "Nice" step (1/2/5 ×10ⁿ) giving ~200 increments across span, never coarser than maxStep.
+function niceStep(span, maxStep) {
+  if (!(span > 0)) return maxStep;
+  const raw = span / 200;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const norm = raw / mag;
+  const nice = norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10;
+  return Math.min(nice * mag, maxStep);
+}
+// True when the live slider range differs from the control's default range (ctl.min/max).
+function isZoomed(ctl) {
+  return roundCanon(+ctl.range.min) !== roundCanon(ctl.min) || roundCanon(+ctl.range.max) !== roundCanon(ctl.max);
+}
+// Show the "restore full range" button only while the range is non-default.
+function refreshZoomBtn(ctl) {
+  ctl.restore.hidden = !isZoomed(ctl);
+}
+// Re-center the range around the current value (narrows symmetrically, finer step); value preserved.
+function centerControl(ctl) {
+  const v = state[ctl.key];
+  const d = Math.min(v - ctl.hardMin, ctl.hardMax - v);  // largest symmetric half-window that fits
+  const half = Math.max(d, ctl.step * 20);               // half = d centers exactly; floor only guards collapse at a bound
+  let min = v - half, max = v + half;
+  if (min < ctl.hardMin) { max += ctl.hardMin - min; min = ctl.hardMin; } // slide window off the wall
+  if (max > ctl.hardMax) { min -= max - ctl.hardMax; max = ctl.hardMax; }
+  min = Math.max(min, ctl.hardMin);
+  ctl.range.min = roundCanon(min);
+  ctl.range.max = roundCanon(max);
+  ctl.range.step = niceStep(max - min, ctl.step);
+  setControlValue(ctl, v); // v is inside [min,max] by construction → expand is a no-op; thumb re-syncs
+  updateTicks(ctl);
+  refreshZoomBtn(ctl);
+  onInput();
+}
+// Snap the range back to its default (config / per-support) bounds.
+function restoreRange(ctl) {
+  ctl.range.min = ctl.min;
+  ctl.range.max = ctl.max;
+  ctl.range.step = ctl.step;
+  expandRangeIfNeeded(ctl, state[ctl.key]); // value may sit outside the default → grow to include it
+  setControlValue(ctl, state[ctl.key]);
+  updateTicks(ctl);
+  refreshZoomBtn(ctl);
+  onInput();
+}
+// Apply a typed range bound (display units): clamp to hard bounds, keep min<max, never negative.
+function setBound(ctl, which, dispVal) {
+  const canon = toCanonical(dispVal, state.unitSystem, ctl.cat);
+  if (!isFinite(canon)) return;
+  if (which === 'min') {
+    ctl.range.min = roundCanon(clamp(canon, Math.max(ctl.hardMin, 0), +ctl.range.max - ctl.step));
+  } else {
+    ctl.range.max = roundCanon(clamp(canon, +ctl.range.min + ctl.step, ctl.hardMax));
+  }
+  setControlValue(ctl, clamp(state[ctl.key], +ctl.range.min, +ctl.range.max)); // value follows a crossing bound
+  updateTicks(ctl);
+  refreshZoomBtn(ctl);
   onInput();
 }
 
@@ -244,22 +307,31 @@ function buildNumControls() {
     wrap.innerHTML = `
       <div class="num-head">
         <label><span class="ctrl-name">${cfg.label}</span> (<span data-unit-label="${cfg.cat}">${unitLabel(state.unitSystem, cfg.cat)}</span>)</label>
-        <button type="button" class="mini-reset" title="Reset to baseline" aria-label="Reset ${cfg.label} to baseline" hidden>↺</button>
+        <span class="ctrl-btns">
+          <button type="button" class="mini-restore" title="Restore full range" aria-label="Restore ${cfg.label} range" hidden>⤢</button>
+          <button type="button" class="mini-center" title="Center range on current value" aria-label="Center ${cfg.label} range">⊙</button>
+          <button type="button" class="mini-reset" title="Reset to baseline" aria-label="Reset ${cfg.label} to baseline" hidden>↺</button>
+        </span>
       </div>
       <div class="slider-wrap">
         <input type="range" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${v0}" aria-label="${cfg.label}" />
         <span class="slider-marker" aria-hidden="true"></span>
       </div>
       <input type="number" step="any" value="${inputStr(fromCanonical(state[cfg.key], state.unitSystem, cfg.cat))}" aria-label="${cfg.label} value" />
-      <div class="slider-ticks"><span class="tick-min"></span><span class="tick-max"></span></div>`;
+      <div class="slider-ticks">
+        <input type="number" class="tick-min" step="any" min="0" aria-label="${cfg.label} range minimum" />
+        <input type="number" class="tick-max" step="any" min="0" aria-label="${cfg.label} range maximum" />
+      </div>`;
     host.appendChild(wrap);
 
     const ctl = {
       ...cfg, el: wrap,
       range: wrap.querySelector('input[type="range"]'),
-      num: wrap.querySelector('input[type="number"]'),
+      num: wrap.querySelector(':scope > input[type="number"]'),
       marker: wrap.querySelector('.slider-marker'),
       miniReset: wrap.querySelector('.mini-reset'),
+      center: wrap.querySelector('.mini-center'),
+      restore: wrap.querySelector('.mini-restore'),
       tickMin: wrap.querySelector('.tick-min'),
       tickMax: wrap.querySelector('.tick-max'),
       nameEl: wrap.querySelector('.ctrl-name'),
@@ -267,6 +339,7 @@ function buildNumControls() {
     numCtrls.push(ctl);
     updateTicks(ctl);
     positionMarker(ctl);
+    refreshZoomBtn(ctl);
 
     ctl.range.addEventListener('input', () => {
       state[cfg.key] = parseFloat(ctl.range.value); // already within element min/max
@@ -292,6 +365,16 @@ function buildNumControls() {
       ctl.num.value = inputStr(fromCanonical(state[cfg.key], state.unitSystem, cfg.cat));
     });
     ctl.miniReset.addEventListener('click', () => resetControl(ctl));
+    ctl.center.addEventListener('click', () => centerControl(ctl));
+    ctl.restore.addEventListener('click', () => restoreRange(ctl));
+
+    // Editable range bounds — apply on commit (Enter/blur), then reflect the clamped value.
+    const commitBound = (which, field) => {
+      setBound(ctl, which, parseFloat(field.value));
+      field.value = inputStr(fromCanonical(which === 'min' ? +ctl.range.min : +ctl.range.max, state.unitSystem, ctl.cat));
+    };
+    ctl.tickMin.addEventListener('change', () => commitBound('min', ctl.tickMin));
+    ctl.tickMax.addEventListener('change', () => commitBound('max', ctl.tickMax));
   }
 }
 

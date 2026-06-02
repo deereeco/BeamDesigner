@@ -180,13 +180,13 @@ html, body {
 
 .num-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
 .num-head label { font-size: .85rem; }
-.mini-reset {
-  margin-left: auto;
+.ctrl-btns { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.mini-center, .mini-restore, .mini-reset {
   border: 0; background: transparent; color: var(--accent);
   font-size: 1rem; line-height: 1; padding: 0 2px; cursor: pointer;
 }
-.mini-reset[hidden] { display: none; }
-.mini-reset:hover { color: var(--ink); }
+.mini-reset[hidden], .mini-restore[hidden] { display: none; }
+.mini-center:hover, .mini-restore:hover, .mini-reset:hover { color: var(--ink); }
 
 .slider-wrap { position: relative; display: flex; align-items: center; }
 .slider-wrap input[type="range"] { flex: 1; accent-color: var(--accent); margin: 0; }
@@ -199,7 +199,7 @@ html, body {
 }
 .slider-marker[hidden] { display: none; }
 
-.num-ctrl input[type="number"] {
+.num-ctrl > input[type="number"] {
   width: 78px; padding: 5px 7px;
   border: 1px solid var(--line-strong); border-radius: 7px;
   font: inherit; background: var(--field); color: var(--ink);
@@ -209,6 +209,22 @@ html, body {
   font-size: .68rem; color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+/* Editable range bounds: read as the muted tick text, reveal a field on hover/focus. */
+.slider-ticks input {
+  width: 52px; padding: 1px 3px; margin: 0;
+  border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: inherit;
+  font: inherit; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.slider-ticks .tick-min { text-align: left; }
+.slider-ticks .tick-max { text-align: right; }
+.slider-ticks input:hover, .slider-ticks input:focus {
+  border-color: var(--line-strong); background: var(--field);
+  color: var(--ink); outline: none;
+}
+.slider-ticks input::-webkit-outer-spin-button,
+.slider-ticks input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .cut-group .cut-status { margin: 0 0 8px; font-size: .8rem; color: var(--muted); }
 .btn {

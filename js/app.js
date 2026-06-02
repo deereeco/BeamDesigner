@@ -257,8 +257,9 @@ function refreshZoomBtn(ctl) {
 // Re-center the range around the current value (narrows symmetrically, finer step); value preserved.
 function centerControl(ctl) {
   const v = state[ctl.key];
-  const d = Math.min(v - ctl.hardMin, ctl.hardMax - v);  // largest symmetric half-window that fits
-  const half = Math.max(d, ctl.step * 20);               // half = d centers exactly; floor only guards collapse at a bound
+  const d = Math.min(v - ctl.hardMin, ctl.hardMax - v);  // distance to nearest hard bound
+  let half = d;                                          // half = d puts v exactly at the midpoint, within the hard bounds
+  if (!(half > 0)) half = ctl.step * 20;                 // v sits on a bound: centering is impossible, so just give a usable window
   let min = v - half, max = v + half;
   if (min < ctl.hardMin) { max += ctl.hardMin - min; min = ctl.hardMin; } // slide window off the wall
   if (max > ctl.hardMax) { min -= max - ctl.hardMax; max = ctl.hardMax; }

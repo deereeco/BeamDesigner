@@ -19,10 +19,22 @@
 </head>
 <body>
   <header class="app-header">
-    <div class="header-titles">
+    <div class="header-left">
+      <div class="seg" id="unit-toggle" role="group" aria-label="Unit system">
+        <button type="button" data-unit="SI" class="active">SI</button>
+        <button type="button" data-unit="imperial">Imperial</button>
+      </div>
       <h1>Beam Designer</h1>
-      <p class="subtitle" id="subtitle">Fixed–fixed beam · prescribed center displacement · live stress &amp; yield state</p>
     </div>
+
+    <div class="fos-banner" id="fos-badge" tabindex="0"
+         title="Euler–Bernoulli model (shear deformation neglected). Reported FoS is the minimum of von Mises &amp; Tresca at the two canonical points — the neutral axis and the extreme fiber — not a full through-depth search. Bending governs for slender beams; transverse shear can govern for short, deep beams (low L/h).">
+      <span class="fos-label">Min FoS</span>
+      <span class="fos-value" id="fos-value">—</span>
+      <span class="fos-state" id="fos-state"></span>
+      <span class="fos-info" aria-hidden="true">ⓘ</span>
+    </div>
+
     <button id="theme-toggle" class="theme-toggle" type="button"
             aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
   </header>
@@ -30,16 +42,6 @@
   <div class="layout">
     <!-- ───────────────── Sidebar: controls ───────────────── -->
     <aside class="sidebar">
-      <section class="ctrl-group">
-        <div class="ctrl-row units-row">
-          <span class="ctrl-label">Units</span>
-          <div class="seg" id="unit-toggle" role="group" aria-label="Unit system">
-            <button type="button" data-unit="SI" class="active">SI</button>
-            <button type="button" data-unit="imperial">Imperial</button>
-          </div>
-        </div>
-      </section>
-
       <section class="ctrl-group">
         <h2>Material</h2>
         <div class="ctrl-row">
@@ -58,7 +60,12 @@
       </section>
 
       <section class="ctrl-group" id="geometry-controls">
-        <h2>Geometry &amp; load</h2>
+        <div class="group-head">
+          <h2>Geometry &amp; load</h2>
+          <button type="button" id="ranges-toggle" class="group-toggle"
+                  aria-pressed="false" title="Edit slider ranges"
+                  aria-label="Toggle editable slider ranges">⤢ ranges</button>
+        </div>
         <div class="ctrl-row beam-row">
           <span class="ctrl-label">Support</span>
           <div class="seg" id="beam-toggle" role="group" aria-label="Support type">
@@ -86,20 +93,15 @@
         <button type="button" id="unpin-btn" class="btn" disabled>Unpin (follow cursor)</button>
       </section>
 
-      <section class="ctrl-group">
-        <div class="fos-badge" id="fos-badge">
-          <span class="fos-label">Min factor of safety</span>
-          <span class="fos-value" id="fos-value">—</span>
-          <span class="fos-state" id="fos-state"></span>
-        </div>
-      </section>
-
       <section class="ctrl-group design-group">
         <h2>Design</h2>
         <div class="design-actions">
-          <button type="button" id="save-design-btn" class="btn">Save</button>
-          <button type="button" id="reset-design-btn" class="btn" disabled>Reset</button>
-          <button type="button" id="copy-link-btn" class="btn">Copy link</button>
+          <button type="button" id="save-design-btn" class="btn icon-btn"
+                  title="Save current inputs as baseline" aria-label="Save design as baseline">💾</button>
+          <button type="button" id="reset-design-btn" class="btn icon-btn" disabled
+                  title="Reset to saved baseline" aria-label="Reset to baseline">↺</button>
+          <button type="button" id="copy-link-btn" class="btn icon-btn"
+                  title="Copy shareable link" aria-label="Copy shareable link">🔗</button>
         </div>
         <p class="design-hint" id="design-hint">Save the current inputs as your baseline, then explore freely.</p>
       </section>
@@ -107,43 +109,7 @@
 
     <!-- ───────────────── Main content ───────────────── -->
     <main class="content">
-      <div class="top-row">
-        <!-- Left column: beam · internal forces · readouts -->
-        <div class="col-left">
-          <section class="panel beam-panel">
-            <h3>Beam <span class="hint">(hover to scan · click to pin · ←/→ to nudge)</span></h3>
-            <svg id="beam-svg" class="svg-beam" tabindex="0" role="slider"
-                 aria-label="Beam cut location" aria-valuemin="0" aria-valuenow="0"></svg>
-          </section>
-
-          <section class="panel diagrams-panel">
-            <h3>Internal forces <span class="hint">(hover or click to move the cut)</span></h3>
-            <div class="diagram-label">Shear V(x)</div>
-            <svg id="shear-svg" class="svg-diagram"></svg>
-            <div class="diagram-label">Moment M(x)</div>
-            <svg id="moment-svg" class="svg-diagram"></svg>
-          </section>
-
-          <section class="panel readout-panel">
-            <div id="readouts" class="readouts"></div>
-          </section>
-        </div>
-
-        <!-- Right column: cross-section dimensions (to scale) · stress at cut -->
-        <div class="col-right">
-          <section class="panel sectiondims-panel">
-            <h3>Cross-section dimensions</h3>
-            <svg id="section-dims-svg" class="svg-section-dims"></svg>
-          </section>
-
-          <section class="panel section-panel">
-            <h3>Stress in cross-section at cut</h3>
-            <svg id="section-svg" class="svg-section"></svg>
-          </section>
-        </div>
-      </div>
-
-      <!-- Full-width analysis band: four plots in one row -->
+      <!-- Stress plots band across the top. -->
       <div class="plot-grid">
         <section class="panel plot-cell" data-point="na">
           <div class="plot-title"><span class="dot dot-na"></span> NA · Mohr's circle</div>
@@ -163,11 +129,34 @@
         </section>
       </div>
 
-      <footer class="app-footer">
-        <p>Euler–Bernoulli model (shear deformation neglected). Reported FoS is the minimum
-        of the two canonical points, not a full through-depth search. Bending governs for
-        slender beams; transverse shear can govern for short, deep beams (low L/h).</p>
-      </footer>
+      <div class="top-row">
+        <!-- Left column: beam · internal forces -->
+        <div class="col-left">
+          <section class="panel beam-panel">
+            <h3>Beam <span class="hint">(hover to scan · click to pin · ←/→ to nudge)</span></h3>
+            <svg id="beam-svg" class="svg-beam" tabindex="0" role="slider"
+                 aria-label="Beam cut location" aria-valuemin="0" aria-valuenow="0"></svg>
+          </section>
+
+          <section class="panel diagrams-panel">
+            <h3>Internal forces <span class="hint">(hover or click to move the cut)</span></h3>
+            <div class="diagram-label">Shear V(x)</div>
+            <svg id="shear-svg" class="svg-diagram"></svg>
+            <div class="diagram-label">Moment M(x)</div>
+            <svg id="moment-svg" class="svg-diagram"></svg>
+          </section>
+        </div>
+
+        <!-- Right column: combined cross-section (dimensions to scale + stress at cut) -->
+        <div class="col-right">
+          <section class="panel section-combined-panel">
+            <h3>Cross-section</h3>
+            <svg id="section-dims-svg" class="svg-section-dims"></svg>
+            <div class="section-subhead">Stress at cut</div>
+            <svg id="section-svg" class="svg-section"></svg>
+          </section>
+        </div>
+      </div>
     </main>
   </div>
 

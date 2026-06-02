@@ -76,14 +76,18 @@ export const DIAGRAM_PAD_X = 56;
 // ───────────────────────── Beam strip ─────────────────────────
 export function drawBeam(svg, state, d, system) {
   const { w, h, g } = setup(svg);
-  const padX = beamPadX(w), padTop = 34, padBot = 26;
+  const padX = beamPadX(w);
   const x0 = padX, x1 = w - padX, plotW = Math.max(1, x1 - x0);
   const L = state.L;
   const toPx = (x) => x0 + (x / L) * plotW;
 
+  // Vertical layout: a top band for the cut label + load arrow, the beam in the
+  // middle, and a lower band for the deflection / reaction labels and end ticks.
   const beamHalf = 15;
-  const midY = padTop + 4 + beamHalf;
-  const maxDefl = Math.max(10, (h - padBot - beamHalf) - midY - 14);
+  const beamTop = 52;
+  const midY = beamTop + beamHalf;          // neutral axis at rest
+  const beamBot = midY + beamHalf;
+  const maxDefl = 42;
   const sat = Math.abs(d.delta) / (Math.abs(d.delta) + 3); // saturating 0..1
   const amp = maxDefl * sat * (d.delta >= 0 ? 1 : -1);
   const model = d.model;
@@ -116,43 +120,65 @@ export function drawBeam(svg, state, d, system) {
   const band = polyPath(top) + ' ' + bot.slice().reverse().map((p) => `L${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(' ') + ' Z';
   g.appendChild(el('path', { d: band, fill: COLORS.band, 'fill-opacity': 0.55, stroke: COLORS.bandStroke, 'stroke-width': 1.5 }));
 
-  // Displacement arrow at the peak-deflection point (center for fixed-fixed, free tip for a
-  // cantilever), when deflected. Flip the label to the left when the arrow sits at the tip.
+  // Applied load P: a down-arrow above the beam at the load point (center for a
+  // fixed-fixed beam, the free tip for a cantilever). Skipped at P≈0 (force mode at 0).
+  const loadX = L * model.dispXFrac;
+  const lpx = toPx(loadX);
+  const nearRight = model.dispXFrac > 0.9;
+  if (d.P > 1e-9) {
+    const aBot = beamTop - 3, aTop = aBot - 19;
+    g.appendChild(el('line', { x1: lpx, y1: aTop, x2: lpx, y2: aBot, stroke: COLORS.ink, 'stroke-width': 1.6 }));
+    g.appendChild(el('path', { d: `M${lpx - 4} ${aBot - 7} L${lpx} ${aBot} L${lpx + 4} ${aBot - 7} Z`, fill: COLORS.ink }));
+    g.appendChild(txt(nearRight ? lpx - 7 : lpx + 7, aTop + 9, `P = ${fmtVal(d.P, system, 'force', 3)}`, { anchor: nearRight ? 'end' : 'start', size: 10, fill: COLORS.ink, weight: 600 }));
+  }
+
+  // Reactions: an up-arrow plus the wall reaction R and the wall moment |M| at each support.
+  for (const side of model.walls) {
+    const sx = side === 'L' ? x0 : x1;
+    const tx = side === 'L' ? sx + 6 : sx - 6;
+    const anchor = side === 'L' ? 'start' : 'end';
+    const aTop = beamBot + 3, aBot = aTop + 17;
+    g.appendChild(el('line', { x1: sx, y1: aBot, x2: sx, y2: aTop, stroke: COLORS.muted, 'stroke-width': 1.6 }));
+    g.appendChild(el('path', { d: `M${sx - 4} ${aTop + 7} L${sx} ${aTop} L${sx + 4} ${aTop + 7} Z`, fill: COLORS.muted }));
+    g.appendChild(txt(tx, aBot + 3, `R = ${fmtVal(d.R, system, 'force', 3)}`, { anchor, size: 9, fill: COLORS.muted, baseline: 'hanging' }));
+    g.appendChild(txt(tx, aBot + 15, `|M| = ${fmtVal(d.Mwall, system, 'moment', 3)}`, { anchor, size: 9, fill: COLORS.muted, baseline: 'hanging' }));
+  }
+
+  // Displacement arrow at the peak-deflection point, when deflected. Flip the label to the
+  // left when the arrow sits at the tip.
   if (Math.abs(amp) > 2) {
-    const dispX = L * model.dispXFrac;
-    const xc = toPx(dispX), yEnd = yCenter(dispX);
-    g.appendChild(el('line', { x1: xc, y1: midY, x2: xc, y2: yEnd, stroke: COLORS.ink, 'stroke-width': 1.5 }));
+    const yEnd = yCenter(loadX);
+    g.appendChild(el('line', { x1: lpx, y1: midY, x2: lpx, y2: yEnd, stroke: COLORS.ink, 'stroke-width': 1.5 }));
     const dir = amp >= 0 ? 1 : -1;
-    g.appendChild(el('path', { d: `M${xc - 4} ${yEnd - 7 * dir} L${xc} ${yEnd} L${xc + 4} ${yEnd - 7 * dir} Z`, fill: COLORS.ink }));
-    const nearRight = model.dispXFrac > 0.9;
-    g.appendChild(txt(nearRight ? xc - 8 : xc + 8, (midY + yEnd) / 2, `δ = ${fmtVal(d.delta, system, 'length', 3)}`, { anchor: nearRight ? 'end' : 'start', size: 10, fill: COLORS.ink }));
+    g.appendChild(el('path', { d: `M${lpx - 4} ${yEnd - 7 * dir} L${lpx} ${yEnd} L${lpx + 4} ${yEnd - 7 * dir} Z`, fill: COLORS.ink }));
+    g.appendChild(txt(nearRight ? lpx - 8 : lpx + 8, (midY + yEnd) / 2, `δ = ${fmtVal(d.delta, system, 'length', 3)}`, { anchor: nearRight ? 'end' : 'start', size: 10, fill: COLORS.ink }));
   }
 
   // End ticks.
-  g.appendChild(txt(x0, h - 8, '0', { size: 10 }));
-  g.appendChild(txt(x1, h - 8, fmtVal(L, system, 'length', 3), { size: 10 }));
+  g.appendChild(txt(x0, h - 7, '0', { size: 10 }));
+  g.appendChild(txt(x1, h - 7, fmtVal(L, system, 'length', 3), { size: 10 }));
 
   // Hover preview (faint) when pinned and hovering elsewhere.
   const pinned = state.cut.xPinned != null;
   if (pinned && state.cut.xHover != null && Math.abs(state.cut.xHover - state.cut.xPinned) > 1) {
     const hx = toPx(Math.min(L, Math.max(0, state.cut.xHover)));
-    g.appendChild(el('line', { x1: hx, y1: padTop - 6, x2: hx, y2: h - padBot, stroke: COLORS.muted, 'stroke-width': 1, 'stroke-dasharray': '3 4' }));
+    g.appendChild(el('line', { x1: hx, y1: beamTop - 20, x2: hx, y2: beamBot + 20, stroke: COLORS.muted, 'stroke-width': 1, 'stroke-dasharray': '3 4' }));
   }
 
   // Cut line at the evaluation location.
   const xE = d.xEval, cx = toPx(xE), yc = yCenter(xE);
   g.appendChild(el('line', {
-    x1: cx, y1: yc - beamHalf - 16, x2: cx, y2: yc + beamHalf + 16,
+    x1: cx, y1: yc - beamHalf - 15, x2: cx, y2: yc + beamHalf + 15,
     stroke: pinned ? COLORS.accent : COLORS.cut,
     'stroke-width': pinned ? 2.5 : 1.5,
     'stroke-dasharray': pinned ? null : '5 4',
   }));
-  // Evaluation-point dots: neutral axis (center) and extreme fiber (top).
+  // Evaluation-point dots: extreme fiber (top) and neutral axis (center).
   g.appendChild(el('circle', { cx, cy: yc - beamHalf, r: 5, fill: COLORS.fiber, stroke: COLORS.halo, 'stroke-width': 1.5 }));
   g.appendChild(el('circle', { cx, cy: yc, r: 5, fill: COLORS.na, stroke: COLORS.halo, 'stroke-width': 1.5 }));
 
-  // Location label.
-  g.appendChild(txt(cx, padTop - 14, `x = ${fmtVal(xE, system, 'length', 3)}${pinned ? '  📌 pinned' : ''}`, {
+  // Location label (top band).
+  g.appendChild(txt(cx, 13, `x = ${fmtVal(xE, system, 'length', 3)}${pinned ? '  📌 pinned' : ''}`, {
     anchor: 'middle', size: 11, fill: pinned ? COLORS.accent : COLORS.ink, weight: 600,
   }));
 
@@ -203,6 +229,14 @@ export function drawDiagram(svg, state, d, key, system) {
     'stroke-width': pinned ? 2.2 : 1.2,
     'stroke-dasharray': pinned ? null : '4 3',
   }));
+
+  // At-cut value: a marker on the curve and a label at the top edge (consolidated from
+  // the former readout table). Highlighted when the cut is pinned.
+  const cutVal = key === 'M' ? d.Mx : d.Vx;
+  const cyCut = toPy(cutVal);
+  g.appendChild(el('circle', { cx, cy: cyCut, r: 3, fill: pinned ? COLORS.accent : color, stroke: COLORS.halo, 'stroke-width': 1 }));
+  const leftHalf = cx < (x0 + x1) / 2;
+  g.appendChild(txt(leftHalf ? cx + 5 : cx - 5, padT + 8, `${key}(x) = ${fmtVal(cutVal, system, cat, 3)}`, { anchor: leftHalf ? 'start' : 'end', size: 9, fill: pinned ? COLORS.accent : COLORS.ink, weight: 600 }));
 
   // Peak labels — only on the side(s) the curve actually occupies. A cantilever's moment is
   // one-signed (all hogging) and its shear is constant, so the opposite label is suppressed.
@@ -294,8 +328,9 @@ export function drawSectionDims(svg, state, system) {
   const { w, h, g } = setup(svg);
   const b = Math.max(1e-6, state.b), hh = Math.max(1e-6, state.h); // canonical mm
 
-  // Annotation insets: room for the vertical dim (left) + horizontal dim (below).
-  const mL = 56, mR = 18, mT = 18, mB = 44;
+  // Annotation insets: vertical dim (left), horizontal dim (below), orientation
+  // labels + axis key (right), caption (top).
+  const mL = 56, mR = 92, mT = 24, mB = 44;
   const availW = Math.max(10, w - mL - mR);
   const availH = Math.max(10, h - mT - mB);
 
@@ -335,7 +370,32 @@ export function drawSectionDims(svg, state, system) {
     transform: `rotate(-90 ${dimX - 6} ${hy})`,
   }, `h = ${fmtVal(hh, system, 'length', 3)}`));
 
-  if (notToScale) g.appendChild(txt(rx + rw / 2, ry - 6, '(not to scale)', { size: 9, fill: COLORS.muted }));
+  // ── Orientation cue: this rectangle is the beam sliced at the cut, viewed
+  //    end-on — looking along the beam's length. Mark the extreme fiber (top)
+  //    and the neutral axis (mid) in the same colors as the dots on the beam. ──
+  const cxR = rx + rw / 2;
+  g.appendChild(el('circle', { cx: cxR, cy: ry, r: 4, fill: COLORS.fiber, stroke: COLORS.halo, 'stroke-width': 1.5 }));
+  g.appendChild(el('circle', { cx: cxR, cy: ry + rh / 2, r: 4, fill: COLORS.na, stroke: COLORS.halo, 'stroke-width': 1.5 }));
+  const lblX = rx + rw + 9;
+  g.appendChild(txt(lblX, ry + 3, 'extreme fiber', { anchor: 'start', size: 9, fill: COLORS.fiber }));
+  g.appendChild(txt(lblX, ry + rh / 2 + 3, 'neutral axis', { anchor: 'start', size: 9, fill: COLORS.na }));
+
+  // Caption (folds in the not-to-scale note when the aspect is clamped).
+  const cap = 'looking along beam axis' + (notToScale ? ' · not to scale' : '');
+  g.appendChild(txt(cxR, mT - 11, cap, { anchor: 'middle', size: 9, fill: COLORS.muted }));
+
+  // Axis key: x ⊗ (beam axis, into the page) · y up (depth) · z across (width b).
+  const kx = rx + rw + 34, ky = ry + rh - 2;
+  g.appendChild(el('circle', { cx: kx, cy: ky, r: 5.5, fill: 'none', stroke: COLORS.ink, 'stroke-width': 1.2 }));
+  g.appendChild(el('line', { x1: kx - 3.9, y1: ky - 3.9, x2: kx + 3.9, y2: ky + 3.9, stroke: COLORS.ink, 'stroke-width': 1.2 }));
+  g.appendChild(el('line', { x1: kx - 3.9, y1: ky + 3.9, x2: kx + 3.9, y2: ky - 3.9, stroke: COLORS.ink, 'stroke-width': 1.2 }));
+  g.appendChild(txt(kx - 9, ky + 3, 'x', { anchor: 'end', size: 9, fill: COLORS.ink }));
+  g.appendChild(el('line', { x1: kx, y1: ky - 6, x2: kx, y2: ky - 20, stroke: COLORS.ink, 'stroke-width': 1.2 }));
+  arrowTri(g, kx, ky - 20, 'U', COLORS.ink);
+  g.appendChild(txt(kx + 5, ky - 15, 'y', { anchor: 'start', size: 9, fill: COLORS.ink }));
+  g.appendChild(el('line', { x1: kx + 6, y1: ky, x2: kx + 20, y2: ky, stroke: COLORS.ink, 'stroke-width': 1.2 }));
+  arrowTri(g, kx + 20, ky, 'R', COLORS.ink);
+  g.appendChild(txt(kx + 14, ky + 13, 'z (b)', { anchor: 'middle', size: 9, fill: COLORS.ink }));
 
   svg.appendChild(g);
 }

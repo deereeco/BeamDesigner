@@ -69,7 +69,6 @@ const unitToggle = $('unit-toggle');
 const driveToggle = $('drive-toggle');
 const beamToggle = $('beam-toggle');
 const themeToggle = $('theme-toggle');
-const subtitleEl = $('subtitle');
 const cutStatus = $('cut-status');
 const cutNum = $('cut-num');
 const unpinBtn = $('unpin-btn');
@@ -79,7 +78,6 @@ const copyLinkBtn = $('copy-link-btn');
 const designHint = $('design-hint');
 const fosValue = $('fos-value');
 const fosState = $('fos-state');
-const readouts = $('readouts');
 
 const DESIGN_HINT_DEFAULT = designHint ? designHint.textContent : '';
 
@@ -153,7 +151,6 @@ function applyState(p) {
   for (const ctl of numCtrls) setControlValue(ctl, pick(p[ctl.key], DEFAULTS[ctl.key]));
   applyModelRanges(state.beamType);
   refreshControlLabels();
-  updateSubtitle();
 
   materialSelect.value = findMaterialMerged(state.material.name) ? state.material.name : 'Custom';
   refreshMaterialInputs();
@@ -379,6 +376,18 @@ function buildNumControls() {
   }
 }
 
+// Collapse/reveal the per-slider editable min/max range inputs as one group. The
+// center (⊙) / restore (⤢) buttons stay visible; only the numeric bounds hide.
+function wireRangesToggle() {
+  const toggle = $('ranges-toggle');
+  const host = $('geometry-controls');
+  if (!toggle || !host) return;
+  toggle.addEventListener('click', () => {
+    const open = host.classList.toggle('show-ranges');
+    toggle.setAttribute('aria-pressed', String(open));
+  });
+}
+
 // ───────────────────────── Drive-mode toggle ─────────────────────────
 function buildDriveToggle() {
   driveToggle.querySelectorAll('button').forEach((btn) => {
@@ -417,7 +426,6 @@ function buildBeamToggle() {
       refreshBeamToggleUI();
       applyModelRanges(t);     // rescale the δ/P sliders to the new support
       refreshControlLabels();
-      updateSubtitle();
       onInput();               // the active driving input stays; the derived one recomputes
     });
   });
@@ -432,10 +440,6 @@ function refreshControlLabels() {
     const name = ctl.key === 'delta' ? model.dispLabel : ctl.key === 'P' ? model.loadLabel : ctl.label;
     if (ctl.nameEl) ctl.nameEl.textContent = name;
   }
-}
-function updateSubtitle() {
-  const model = BEAM_MODELS[state.beamType] || BEAM_MODELS['fixed-fixed'];
-  if (subtitleEl) subtitleEl.textContent = model.subtitle;
 }
 // Reset the load-dependent sliders (δ, P) to the support's default range; the current value
 // re-clamps and the range still auto-expands past these defaults when a value needs it.
@@ -712,25 +716,8 @@ function buildDesignToolbar() {
   });
 }
 
-// ───────────────────────── Readouts ─────────────────────────
-function updateReadouts(d) {
-  const s = state.unitSystem;
-  const m = d.model;
-  const fv = (v, cat) => fmtVal(v, s, cat, 3);
-  const row = (l, v) => `<tr><th>${l}</th><td>${v}</td></tr>`;
-  const tbl = (title, cls, rows) =>
-    `<div class="ro-group ${cls}"><h4>${title}</h4><table class="ro-table"><tbody>${rows}</tbody></table></div>`;
-  readouts.innerHTML =
-    tbl('Loading &amp; reactions', '',
-      row(m.loadLabel, fv(d.P, 'force')) +
-      row(m.dispLabel, fv(d.delta, 'length')) +
-      row('Wall reaction R', fv(d.R, 'force')) +
-      row(m.momentLabel, fv(d.Mwall, 'moment'))) +
-    tbl('At cut', '',
-      row('x', fv(d.xEval, 'length')) +
-      row('M(x)', fv(d.Mx, 'moment')) +
-      row('V(x)', fv(d.Vx, 'force')));
-}
+// (Readouts table removed — P / δ / R / |M|wall are annotated on the beam, M(x) / V(x)
+// on the shear & moment diagrams, and stress / FoS on the Mohr & yield-envelope plots.)
 
 function updateFoS(d) {
   const f = d.globalFoS;
@@ -769,7 +756,6 @@ function render() {
   drawMohr(mohrFiberSvg, d.pointFiber, d.sigmaY, COLORS.fiber, sys);
   drawEnvelope(envFiberSvg, d.pointFiber, d.sigmaY, sys);
 
-  updateReadouts(d);
   updateFoS(d);
   updateCutUI();
 }
@@ -790,6 +776,7 @@ function init() {
   refreshColors();        // populate COLORS from CSS vars before the first draw
   wireThemeToggle();
   buildNumControls();
+  wireRangesToggle();
   buildDriveToggle();
   buildBeamToggle();
   buildMaterials();
